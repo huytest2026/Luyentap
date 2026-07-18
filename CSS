@@ -1,0 +1,56 @@
+/* --- TỔNG THỂ --- */
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #fdfaf6; padding: 20px; color: #333; }
+.container { background: #ffffff; padding: 40px; max-width: 800px; margin: auto; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+h1 { text-align: center; color: #2c3e50; }
+
+/* --- TRẠNG THÁI & THẺ CÂU HỎI --- */
+.status-bar { position: sticky; top: 10px; z-index: 1000; background: #ffffff; border: 1px solid #d1d5db; padding: 15px 25px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); font-weight: bold; }
+.quiz-card { background: #fcfcfc; padding: 25px; margin-bottom: 25px; border-radius: 15px; border: 1px solid #ececec; border-left: 6px solid #4a90e2; }
+
+/* --- ÂM THANH (NHỎ GỌN) --- */
+.speaker-btn {
+    padding: 2px 8px;
+    margin-left: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    background: #f0f0f0;
+    vertical-align: middle;
+}
+.speaker-btn:hover { background: #e0e0e0; }
+
+/* --- TỪ VỰNG (VOCABULARY) --- */
+input[type="text"] {
+    padding: 10px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 1em;
+    width: 200px; /* Độ rộng vừa phải */
+}
+.check-voca-btn {
+    display: inline-block;
+    width: auto;
+    padding: 10px 20px;
+    background-color: #0056b3; /* Màu xanh dương đậm hơn */
+    color: #ffffff; /* Chữ trắng hoàn toàn */
+    border: none;
+    border-radius: 8px;
+    font-weight: 800; /* Làm chữ đậm (bold) hơn */
+    cursor: pointer;
+    margin-left: 10px;
+    text-shadow: none;
+}
+
+/* --- TRẮC NGHIỆM --- */
+.option-box { border: 2px solid #e2e8f0; padding: 15px; margin: 8px 0; border-radius: 10px; cursor: pointer; background: #ffffff; transition: 0.2s; }
+.option-box:hover { background-color: #f0f7ff; border-color: #4a90e2; }
+
+/* --- CÁC NÚT BẤM CHÍNH --- */
+button { width: 100%; padding: 15px; border: none; cursor: pointer; border-radius: 10px; font-weight: bold; margin-top: 10px; }
+#start-btn { background: #4a90e2; color: white; }
+#submit-btn { background: #28a745; color: white; margin-top: 20px; }
+
+/* --- BẢNG XẾP HẠNG --- */
+.info-box { background: #f8f9fa; border: 2px solid #e2e8f0; padding: 20px; margin-top: 20px; border-radius: 15px; }
+#ranking-list { text-align: left; padding-left: 20px; }
