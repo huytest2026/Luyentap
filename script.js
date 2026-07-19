@@ -102,17 +102,21 @@ window.startQuiz = function() {
     const selected = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
     if (!selected.length) return alert("Vui lòng chọn chủ đề!");
     
-    // Lấy câu hỏi và giới hạn số lượng
-    let filtered = AppState.allQuizData.filter(i => i.mon === mon && selected.includes(i.chuDe));
+    // Giới hạn số lượng câu hỏi: Toán 10 câu, Tiếng Anh 20 câu
     let limit = (mon === 'Toán') ? 10 : 20;
     
+    let filtered = AppState.allQuizData.filter(i => i.mon === mon && selected.includes(i.chuDe));
     AppState.currentQuizData = filtered.sort(() => 0.5 - Math.random()).slice(0, limit);
+    
+    // Reset bộ đếm trước khi bắt đầu
+    AppState.correctCount = 0;
+    AppState.wrongCount = 0;
     
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
     
     window.renderQuiz();
-    // Bắt đầu đếm ngược: 15p cho Toán, 8p cho tiếng anh
+    // Bắt đầu đếm ngược: 15p cho Toán, 8p cho Tiếng Anh
     window.startTimer(mon === 'Toán' ? 15 : 8);
 };
 
@@ -142,23 +146,68 @@ window.checkAnswer = function(i, selectedKey, element, selectedText) {
     const isCorrect = (selectedText.trim() === correctValue) || (selectedKey.toLowerCase() === correctValue.toLowerCase());
     element.style.backgroundColor = isCorrect ? '#d4edda' : '#f8d7da';
     element.parentElement.querySelectorAll('.option-box').forEach(box => box.style.pointerEvents = 'none');
-    if (isCorrect) AppState.correctCount++;
-    else AppState.wrongCount++;
+    
+    if (isCorrect) {
+        AppState.correctCount++;
+        document.getElementById('count-correct').innerText = AppState.correctCount;
+    } else {
+        AppState.wrongCount++;
+        document.getElementById('count-wrong').innerText = AppState.wrongCount;
+    }
 };
 
+window.checkVoca = function(i, correctAnswer) {
+    const input = document.getElementById(`input-voca-${i}`);
+    if (input.value.trim().toLowerCase() === correctAnswer.toLowerCase()) {
+        input.style.backgroundColor = '#d4edda';
+        AppState.correctCount++;
+        document.getElementById('count-correct').innerText = AppState.correctCount;
+    } else {
+        input.style.backgroundColor = '#f8d7da';
+        AppState.wrongCount++;
+        document.getElementById('count-wrong').innerText = AppState.wrongCount;
+    }
+    input.disabled = true;
+};
+
+// --- 6. Nộp bài (Logic tính điểm mới) ---
 window.submitQuiz = function() {
-    clearInterval(AppState.timerInterval); // Dừng đồng hồ khi nộp bài
-    const total = AppState.currentQuizData.length; // Số câu đã chọn thi
-    const score = total > 0 ? Math.round((AppState.correctCount / total) * 100) : 0;
+    clearInterval(AppState.timerInterval); // Dừng đồng hồ
     
-    const dataToSend = { maHS: document.getElementById('student-code').value, score: score, total: total, mon: document.getElementById('subject-select').value };
+    const mon = document.getElementById('subject-select').value;
+    const correct = AppState.correctCount;
+    
+    // Tính điểm: 
+    // Toán: 1 câu đúng = 1 điểm (tổng 10 câu = 10 điểm)
+    // Tiếng Anh: 1 câu đúng = 0.5 điểm (tổng 20 câu = 10 điểm)
+    let score = (mon === 'Toán') ? correct : (correct * 0.5);
+    score = parseFloat(score.toFixed(1)); // Làm tròn để tránh lỗi số thập phân
+    
+    const dataToSend = { 
+        maHS: document.getElementById('student-code').value, 
+        score: score, 
+        total: AppState.currentQuizData.length, 
+        mon: mon 
+    };
+    
     fetch("https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec", {
         method: "POST", mode: "no-cors",
         body: JSON.stringify(dataToSend)
     }).then(() => {
-        alert("Nộp bài thành công! Điểm: " + score);
-        location.reload();
+        alert("Nộp bài thành công! Bạn được: " + score + " điểm.");
+        location.reload(); // Reload để cập nhật bảng xếp hạng
     });
+};
+
+// --- 7. Âm thanh ---
+window.speakText = function(text, questionIndex, mon) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        let cleanText = text.replace(/_+/g, " ");
+        const utterance = new SpeechSynthesisUtterance("Câu " + (parseInt(questionIndex) + 1) + ". " + cleanText);
+        utterance.lang = (mon === 'Tiếng anh') ? 'en-US' : 'vi-VN';
+        window.speechSynthesis.speak(utterance);
+    }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
