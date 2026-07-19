@@ -103,13 +103,19 @@ window.renderQuiz = function() {
     }).join('');
 };
 
-window.speakText = function(text, questionIndex) {
+window.speakText = function(text, questionIndex, mon) {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        let cleanText = text.replace(/_+/g, " "); 
+        
+        // Thay thế dấu _ bằng "chỗ trống" để máy đọc tự nhiên hơn
+        let cleanText = text.replace(/_+/g, " chỗ trống ");
         let fullText = "Câu " + (questionIndex + 1) + ". " + cleanText;
+        
         const utterance = new SpeechSynthesisUtterance(fullText);
-        utterance.lang = 'vi-VN'; 
+        
+        // Nếu là môn Tiếng Anh thì dùng giọng Anh, ngược lại dùng giọng Việt
+        utterance.lang = (mon === 'Tiếng anh') ? 'en-US' : 'vi-VN';
+        
         window.speechSynthesis.speak(utterance);
     }
 };
