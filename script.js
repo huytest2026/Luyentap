@@ -3,7 +3,7 @@ const AppState = {
     allQuizData: [], userPermissions: [], rankings: [],
     currentQuizData: [], timerInterval: null,
     correctCount: 0, wrongCount: 0,
-    wrongQuestions: [] 
+    wrongQuestions: [] // Mảng lưu câu sai
 };
 
 // --- CÀI ĐẶT GIAO DIỆN ---
@@ -136,9 +136,10 @@ window.renderQuiz = function() {
         const type = (item.loai || "").toLowerCase().trim();
         const safeQuestion = escapeHTML(item.question);
         
-        // Tạo phần hiển thị giải thích (nếu có dữ liệu)
-        const explanationHtml = (item.giai_thich) ? 
-            `<div class="explanation-box" id="explanation-${i}"><b>💡 Giải thích:</b> ${escapeHTML(item.giai_thich)}</div>` : '';
+        // Lấy giải thích từ cột "Diễn giải" trong Google Sheet
+        const giaiThichText = item["Diễn giải"] || ""; 
+        const explanationHtml = (giaiThichText) ? 
+            `<div class="explanation-box" id="explanation-${i}"><b>💡 Giải thích:</b> ${escapeHTML(giaiThichText)}</div>` : '';
 
         const speakBtn = (subjectValue === 'Tiếng anh') ? 
             `<button onclick="window.speakText('${safeQuestion.replace(/'/g, "\\'")}', ${i}, '${subjectValue}')" class="speaker-btn">🔊 Nghe</button>` : '';
@@ -210,10 +211,13 @@ window.submitQuiz = function() {
     }).then(() => { 
         alert("Nộp bài thành công! Bạn được: " + score + " điểm."); 
         document.getElementById('quiz-screen').style.display = 'none';
+        
         const startScreen = document.getElementById('start-screen');
         startScreen.style.display = 'block';
+        
         const oldBtn = document.getElementById('retry-wrong-btn');
         if (oldBtn) oldBtn.remove();
+        
         if (AppState.wrongQuestions.length > 0) {
             const btn = document.createElement('button');
             btn.id = 'retry-wrong-btn';
