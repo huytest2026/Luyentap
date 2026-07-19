@@ -2,7 +2,7 @@
 const AppState = {
     allQuizData: [],
     userPermissions: [],
-    rankings: [], // Mới: Lưu bảng xếp hạng
+    rankings: [],
     currentQuizData: [],
     timerInterval: null,
     correctCount: 0,
@@ -35,19 +35,23 @@ window.handleQuizData = function(data) {
     if (data.error) return alert("Lỗi: " + data.error);
     AppState.allQuizData = data.questions || [];
     AppState.userPermissions = data.permissions || [];
-    AppState.rankings = data.rankings || []; // Lưu dữ liệu xếp hạng
+    AppState.rankings = data.rankings || [];
     
-    window.renderLeaderboard(); // Hiển thị bảng xếp hạng
+    window.renderLeaderboard();
+    window.updateTopicList(); // Đã thêm lại hàm này
     alert("Tải dữ liệu thành công!");
-    window.updateTopicList();
 };
 
 // --- 2. Bảng xếp hạng (Leaderboard) ---
 window.renderLeaderboard = function() {
     const list = document.getElementById('ranking-list');
-    if (!list || !AppState.rankings.length) return;
+    if (!list) return;
 
-    // Sắp xếp theo điểm giảm dần, lấy top 3
+    if (AppState.rankings.length === 0) {
+        list.innerHTML = "Chưa có dữ liệu.";
+        return;
+    }
+
     const top3 = AppState.rankings.sort((a, b) => b.score - a.score).slice(0, 3);
 
     list.innerHTML = top3.map((item, index) => {
@@ -60,7 +64,29 @@ window.renderLeaderboard = function() {
     }).join('');
 };
 
-// --- 3. Hàm hiển thị Quiz/Voca ---
+// --- 3. Quản lý chủ đề (Bị thiếu lúc trước) ---
+window.updateTopicList = function() {
+    const mon = document.getElementById('subject-select').value;
+    const maHS = document.getElementById('student-code').value.trim();
+    const container = document.getElementById('topic-container');
+    
+    if (!container || !mon) return;
+    
+    const allowed = AppState.userPermissions
+        .filter(p => String(p.maHS) === maHS && p.mon === mon)
+        .map(p => p.chuDe);
+        
+    const topics = [...new Set(AppState.allQuizData.filter(i => i.mon === mon).map(i => i.chuDe))];
+    
+    container.innerHTML = topics.map(topic => {
+        const isAllowed = allowed.includes(topic);
+        return `<label style="display:block; margin:5px 0; opacity:${isAllowed ? '1' : '0.5'}">
+            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : 'disabled'}> ${escapeHTML(topic)}
+        </label>`;
+    }).join('');
+};
+
+// --- 4. Hiển thị Quiz/Voca ---
 window.renderQuiz = function() {
     const quizDiv = document.getElementById('quiz');
     if (!quizDiv) return;
@@ -70,7 +96,6 @@ window.renderQuiz = function() {
         const type = (item.loai || "").toLowerCase().trim();
         const safeQuestion = escapeHTML(item.question);
         
-        // Chỉ tạo nút Nghe nếu là Tiếng Anh
         const speakBtn = (subjectValue === 'Tiếng anh') ? 
             `<button onclick="window.speakText('${safeQuestion.replace(/'/g, "\\'")}', ${i}, '${subjectValue}')" 
                      style="margin-bottom:10px; cursor:pointer; background:#007bff; color:white; border:none; padding:5px 10px; border-radius:4px;">
@@ -103,18 +128,18 @@ window.renderQuiz = function() {
     }).join('');
 };
 
-// --- 4. Âm thanh ---
+// --- 5. Âm thanh ---
 window.speakText = function(text, questionIndex, mon) {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        let cleanText = text.replace(/_+/g, " "); // Xử lý gạch dưới
+        let cleanText = text.replace(/_+/g, " ");
         const utterance = new SpeechSynthesisUtterance("Câu " + (parseInt(questionIndex) + 1) + ". " + cleanText);
         utterance.lang = (mon === 'Tiếng anh') ? 'en-US' : 'vi-VN';
         window.speechSynthesis.speak(utterance);
     }
 };
 
-// --- 5. Logic Check ---
+// --- 6. Logic Check ---
 window.checkVoca = function(i, correctAnswer) {
     const input = document.getElementById(`input-voca-${i}`);
     const res = document.getElementById(`result-voca-${i}`);
@@ -133,15 +158,12 @@ window.checkAnswer = function(i, selectedKey, element, selectedText) {
     const correctValue = String(AppState.currentQuizData[i].correct).trim();
     const isCorrect = (selectedText.trim() === correctValue) || (selectedKey.toLowerCase() === correctValue.toLowerCase());
     element.style.backgroundColor = isCorrect ? '#d4edda' : '#f8d7da';
-    
-    // Khóa các lựa chọn
     element.parentElement.querySelectorAll('.option-box').forEach(box => box.style.pointerEvents = 'none');
-    
     if (isCorrect) AppState.correctCount++;
     else AppState.wrongCount++;
 };
 
-// --- 6. Start/Submit ---
+// --- 7. Start/Submit ---
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
     const selected = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
@@ -151,6 +173,21 @@ window.startQuiz = function() {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
     window.renderQuiz();
+};
+
+window.submitQuiz = function() {
+    const total = AppState.correctCount + AppState.wrongCount;
+    const score = total > 0 ? Math.round((AppState.correctCount / total) * 100) : 0;
+    
+    // Gửi kết quả lên server
+    const dataToSend = { maHS: document.getElementById('student-code').value, score: score, total: total, mon: document.getElementById('subject-select').value };
+    fetch("https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec", {
+        method: "POST", mode: "no-cors",
+        body: JSON.stringify(dataToSend)
+    }).then(() => {
+        alert("Nộp bài thành công! Điểm: " + score);
+        location.reload(); // Reload để cập nhật lại bảng xếp hạng
+    });
 };
 
 document.addEventListener('DOMContentLoaded', () => {
