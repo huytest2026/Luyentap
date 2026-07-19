@@ -1,132 +1,179 @@
-// --- KHO CHỨA DỮ LIỆU ---
+// --- Quản lý trạng thái ---
 const AppState = {
     allQuizData: [], userPermissions: [], rankings: [],
-    currentQuizData: [], correctCount: 0, wrongCount: 0
+    currentQuizData: [], timerInterval: null,
+    correctCount: 0, wrongCount: 0,
+    wrongQuestions: []
 };
 
-// --- 1. NẠP DỮ LIỆU ---
-window.loadData = function() {
-    const maHS = document.getElementById('student-code')?.value.trim();
-    if (!maHS) return alert("Vui lòng nhập mã học sinh!");
+// --- CÀI ĐẶT GIAO DIỆN ---
+(function injectStyles() {
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .container { background: #e4cbf5; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
+        .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
+        .option-box:hover { background: #e9ecef; border-color: #adb5bd; }
+        .explanation-box { margin-top: 15px; padding: 12px; background: #fff3cd; border-left: 5px solid #ffc107; border-radius: 4px; display: none; color: #856404; font-size: 0.95em; line-height: 1.4; }
+        .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
+        .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+        .medal { font-size: 1.2em; margin-right: 10px; }
+        .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
+        .time-text { font-size: 0.8em; color: #888; display: block; }
+        .speaker-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; }
+        #retry-wrong-btn { background: #d9534f; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
+    `;
+    document.head.appendChild(style);
+})();
+
+function escapeHTML(str) {
+    if (!str) return "";
+    return String(str).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+    });
+}
+
+// --- LOGIC MỞ KHÓA LEVEL ---
+window.checkLevelUnlock = function() {
+    const maxLevel = parseInt(localStorage.getItem('maxLevelReached') || 1);
+    const select = document.getElementById('level-select');
+    if (!select) return;
     
-    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
-    const script = document.createElement('script');
-    script.src = API_URL + '?ma=' + encodeURIComponent(maHS) + '&callback=handleQuizData';
-    document.body.appendChild(script);
+    // Mở khóa các option theo cấp độ đạt được
+    for (let i = 0; i < select.options.length; i++) {
+        if (i < maxLevel) {
+            select.options[i].disabled = false;
+        } else {
+            select.options[i].disabled = true;
+        }
+    }
 };
 
-// --- 2. XỬ LÝ DỮ LIỆU TRẢ VỀ (Hàm chính) ---
+// --- CÁC HÀM DỮ LIỆU ---
 window.handleQuizData = function(data) {
-    if (data.error) return alert("Lỗi từ Google: " + data.error);
-    
+    if (data.error) return alert("Lỗi: " + data.error);
     AppState.allQuizData = data.questions || [];
     AppState.userPermissions = data.permissions || [];
     AppState.rankings = data.rankings || [];
-    
-    // Gọi các hàm render giao diện
     window.renderLeaderboard();
-    window.renderSubjectOptions();
+    window.updateTopicList();
+    window.checkLevelUnlock(); // Kiểm tra mở khóa khi tải xong data
 };
 
-// --- 3. BẢNG XẾP HẠNG ---
-window.renderLeaderboard = function() {
-    const container = document.getElementById('ranking-list'); // PHẢI CÓ ID NÀY
-    if (!container) { console.error("Thiếu thẻ HTML có id='ranking-list'"); return; }
-    
-    if (AppState.rankings.length === 0) {
-        container.innerHTML = "Chưa có dữ liệu xếp hạng.";
-        return;
-    }
-    
-    container.innerHTML = AppState.rankings
-        .sort((a, b) => b.diem - a.diem)
-        .slice(0, 5)
-        .map(r => `<div class="leaderboard-item"><span>${r.tenHS || 'Ẩn danh'}</span><span><strong>${r.diem} điểm</strong></span></div>`).join('');
-};
-
-// --- 4. TỰ ĐỘNG ĐIỀN MÔN HỌC ---
-window.renderSubjectOptions = function() {
-    const select = document.getElementById('subject-select'); // PHẢI CÓ ID NÀY
-    if (!select) { console.error("Thiếu thẻ HTML có id='subject-select'"); return; }
-    
-    const subjects = [...new Set(AppState.allQuizData.map(i => String(i.Môn).trim()))];
-    select.innerHTML = '<option value="">-- Chọn môn --</option>' + 
-        subjects.map(s => `<option value="${s}">${s}</option>`).join('');
-};
-
-// --- 5. CẬP NHẬT CHỦ ĐỀ ---
-window.updateTopicList = function() {
-    const mon = document.getElementById('subject-select').value.trim();
+window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
-    const container = document.getElementById('topic-container'); // PHẢI CÓ ID NÀY
-    if (!container) return;
-    if (!mon) { container.innerHTML = ""; return; }
+    if (!maHS) return alert("Vui lòng nhập mã học sinh!");
+    localStorage.setItem('saved_maHS', maHS);
+    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+    const script = document.createElement('script');
+    script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
+    script.onerror = () => { alert("Lỗi tải dữ liệu!"); script.remove(); };
+    document.body.appendChild(script);
+    script.onload = () => script.remove();
+};
 
-    const allowed = AppState.userPermissions
-        .filter(p => String(p.maHS).trim() === maHS && String(p.mon).trim() === mon)
-        .map(p => String(p.chuDe).trim());
-
-    const topics = [...new Set(AppState.allQuizData
-        .filter(i => String(i.Môn).trim() === mon)
-        .map(i => String(i['Chủ đề']).trim()))];
-
+window.updateTopicList = function() {
+    const mon = document.getElementById('subject-select').value;
+    const maHS = document.getElementById('student-code').value.trim();
+    const container = document.getElementById('topic-container');
+    if (!container || !mon) return;
+    const allowed = AppState.userPermissions.filter(p => String(p.maHS) === maHS && p.mon === mon).map(p => p.chuDe);
+    const topics = [...new Set(AppState.allQuizData.filter(i => i.mon === mon).map(i => i.chuDe))];
     container.innerHTML = topics.map(topic => {
-        const isChecked = allowed.includes(topic) ? 'checked' : '';
-        const isDisabled = allowed.includes(topic) ? '' : 'disabled';
-        return `<label><input type="checkbox" name="topic" value="${topic}" ${isChecked} ${isDisabled}> ${topic}</label><br>`;
+        const isAllowed = allowed.includes(topic);
+        return `<label style="display:block; margin:5px 0; opacity:${isAllowed ? '1' : '0.5'}">
+            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : 'disabled'}> ${escapeHTML(topic)}
+        </label>`;
     }).join('');
 };
 
-// --- 6. BẮT ĐẦU BÀI THI ---
+window.renderLeaderboard = function(subjectFilter = null) {
+    const list = document.getElementById('ranking-list');
+    if (!list) return;
+    let data = AppState.rankings;
+    if (subjectFilter && subjectFilter !== "-- Chọn môn --") {
+        data = data.filter(item => item.subject === subjectFilter);
+    }
+    const qualifiedData = data.filter(item => item.score >= 8);
+    if (qualifiedData.length === 0) {
+        list.innerHTML = `<div style="text-align:center; padding: 15px; color: #888;">Chưa có dữ liệu xếp hạng (>= 8).</div>`;
+        return;
+    }
+    const top3 = qualifiedData.sort((a, b) => b.score - a.score).slice(0, 3);
+    list.innerHTML = top3.map((item, index) => {
+        let medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : "🥉");
+        return `
+            <div class="leaderboard-item">
+                <div><span class="medal">${medal}</span> <b>${escapeHTML(item.name)}</b></div>
+                <span class="score-badge">${item.score} đ</span>
+            </div>`;
+    }).join('');
+};
+
+// --- QUIZ LOGIC ---
 window.startQuiz = function() {
-    const mon = document.getElementById('subject-select').value.trim();
+    const mon = document.getElementById('subject-select').value;
     const levelSelected = document.getElementById('level-select').value;
     const selected = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
     
-    if (selected.length === 0) return alert("Vui lòng chọn chủ đề!");
+    if (!selected.length) return alert("Vui lòng chọn chủ đề!");
     
-    const filtered = AppState.allQuizData.filter(i => 
-        String(i.Môn).trim() === mon && 
-        selected.includes(String(i['Chủ đề']).trim()) && 
-        String(i.Level).trim() === String(levelSelected)
+    // LỌC THEO MÔN, CHỦ ĐỀ VÀ CẤP ĐỘ
+    let filtered = AppState.allQuizData.filter(i => 
+        i.mon === mon && 
+        selected.includes(i.chuDe) && 
+        String(i.level) === String(levelSelected)
     );
     
-    if (filtered.length === 0) return alert("Không có câu hỏi!");
+    if (filtered.length === 0) return alert("Không có câu hỏi cho cấp độ này!");
     
-    AppState.currentQuizData = filtered.sort(() => 0.5 - Math.random()).slice(0, 10);
+    let limit = (mon === 'Toán') ? 10 : 20;
+    AppState.currentQuizData = filtered.sort(() => 0.5 - Math.random()).slice(0, limit);
     AppState.correctCount = 0; AppState.wrongCount = 0;
-    
+    AppState.wrongQuestions = [];
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
-    
     window.renderQuiz();
+    window.startTimer(mon === 'Toán' ? 15 : 8);
 };
 
-window.renderQuiz = function() {
-    const container = document.getElementById('quiz');
-    container.innerHTML = '';
-    AppState.currentQuizData.forEach((q, index) => {
-        const div = document.createElement('div');
-        div.className = 'quiz-card';
-        div.innerHTML = `<p><strong>Câu ${index + 1}:</strong> ${q["Nội dung câu hỏi"]}</p>` +
-            ['A', 'B', 'C', 'D'].map(opt => `<div class="option-box" onclick="window.checkAnswer(${index}, '${q['Đáp án ' + opt]}', '${q['Đáp án đúng']}', this)">${opt}: ${q['Đáp án ' + opt]}</div>`).join('');
-        container.appendChild(div);
+window.submitQuiz = function() {
+    clearInterval(AppState.timerInterval);
+    const mon = document.getElementById('subject-select').value;
+    const currentLevel = parseInt(document.getElementById('level-select').value);
+    const correct = AppState.correctCount;
+    let score = (mon === 'Toán') ? correct : (correct * 0.5);
+    score = parseFloat(score.toFixed(1));
+
+    // LOGIC MỞ KHÓA
+    if (score >= 8) {
+        let maxLevel = parseInt(localStorage.getItem('maxLevelReached') || 1);
+        if (currentLevel >= maxLevel) {
+            localStorage.setItem('maxLevelReached', currentLevel + 1);
+            alert("Chúc mừng! Bạn đã đạt trên 8 điểm và mở khóa Level mới!");
+        }
+    }
+    
+    const dataToSend = { maHS: document.getElementById('student-code').value, score: score, total: AppState.currentQuizData.length, mon: mon };
+    fetch("https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec", {
+        method: "POST", mode: "no-cors", body: JSON.stringify(dataToSend)
+    }).then(() => { 
+        alert("Nộp bài thành công! Điểm: " + score); 
+        location.reload(); // Tải lại trang để cập nhật bảng xếp hạng và mở khóa
     });
 };
 
-window.checkAnswer = function(index, choice, correct, element) {
-    if (choice === correct) {
-        element.style.backgroundColor = "#d4edda";
-        AppState.correctCount++;
-    } else {
-        element.style.backgroundColor = "#f8d7da";
-        AppState.wrongCount++;
-    }
-};
+// ... (Các hàm khác như renderQuiz, checkAnswer, startTimer, speakText giữ nguyên) ...
 
-// --- 7. KẾT NỐI SỰ KIỆN ---
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('load-data-btn').onclick = window.loadData;
     document.getElementById('start-btn').onclick = window.startQuiz;
-    document.getElementById('subject-select').onchange = window.updateTopicList;
+    document.getElementById('subject-select').addEventListener('change', function() {
+        window.renderLeaderboard(this.value);
+    });
+    const savedMa = localStorage.getItem('saved_maHS');
+    if (savedMa) {
+        document.getElementById('student-code').value = savedMa;
+        window.loadData();
+    }
 });
