@@ -37,22 +37,30 @@ window.handleQuizData = function(data) {
     AppState.userPermissions = data.permissions || [];
     AppState.rankings = data.rankings || [];
     
+    // Hiển thị bảng xếp hạng ban đầu (không lọc)
     window.renderLeaderboard();
     window.updateTopicList();
     alert("Tải dữ liệu thành công!");
 };
 
-// --- 2. Bảng xếp hạng ---
-window.renderLeaderboard = function() {
+// --- 2. Bảng xếp hạng (Đã cập nhật: Lọc theo môn) ---
+window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
     if (!list) return;
 
-    if (AppState.rankings.length === 0) {
-        list.innerHTML = "Chưa có dữ liệu.";
+    // Lọc dữ liệu theo môn học nếu có
+    let data = AppState.rankings;
+    if (subjectFilter && subjectFilter !== "-- Chọn môn --") {
+        data = data.filter(item => item.subject === subjectFilter);
+    }
+
+    if (data.length === 0) {
+        list.innerHTML = "Chưa có dữ liệu cho môn này.";
         return;
     }
 
-    const top3 = AppState.rankings.sort((a, b) => b.score - a.score).slice(0, 3);
+    // Sắp xếp và lấy top 3
+    const top3 = data.sort((a, b) => b.score - a.score).slice(0, 3);
     list.innerHTML = top3.map((item, index) => {
         let medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : "🥉");
         return `<div style="margin: 8px 0; font-size: 1.1em; border-bottom: 1px solid #eee;">${medal} <b>${escapeHTML(item.name)}</b>: ${item.score} điểm (${item.subject})</div>`;
@@ -102,13 +110,11 @@ window.startQuiz = function() {
     const selected = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
     if (!selected.length) return alert("Vui lòng chọn chủ đề!");
     
-    // Giới hạn số lượng câu hỏi: Toán 10 câu, Tiếng Anh 20 câu
     let limit = (mon === 'Toán') ? 10 : 20;
     
     let filtered = AppState.allQuizData.filter(i => i.mon === mon && selected.includes(i.chuDe));
     AppState.currentQuizData = filtered.sort(() => 0.5 - Math.random()).slice(0, limit);
     
-    // Reset bộ đếm trước khi bắt đầu
     AppState.correctCount = 0;
     AppState.wrongCount = 0;
     
@@ -116,7 +122,6 @@ window.startQuiz = function() {
     document.getElementById('quiz-screen').style.display = 'block';
     
     window.renderQuiz();
-    // Bắt đầu đếm ngược: 15p cho Toán, 8p cho Tiếng Anh
     window.startTimer(mon === 'Toán' ? 15 : 8);
 };
 
@@ -170,18 +175,14 @@ window.checkVoca = function(i, correctAnswer) {
     input.disabled = true;
 };
 
-// --- 6. Nộp bài (Logic tính điểm mới) ---
+// --- 6. Nộp bài ---
 window.submitQuiz = function() {
-    clearInterval(AppState.timerInterval); // Dừng đồng hồ
+    clearInterval(AppState.timerInterval);
     
     const mon = document.getElementById('subject-select').value;
     const correct = AppState.correctCount;
-    
-    // Tính điểm: 
-    // Toán: 1 câu đúng = 1 điểm (tổng 10 câu = 10 điểm)
-    // Tiếng Anh: 1 câu đúng = 0.5 điểm (tổng 20 câu = 10 điểm)
     let score = (mon === 'Toán') ? correct : (correct * 0.5);
-    score = parseFloat(score.toFixed(1)); // Làm tròn để tránh lỗi số thập phân
+    score = parseFloat(score.toFixed(1));
     
     const dataToSend = { 
         maHS: document.getElementById('student-code').value, 
@@ -195,7 +196,7 @@ window.submitQuiz = function() {
         body: JSON.stringify(dataToSend)
     }).then(() => {
         alert("Nộp bài thành công! Bạn được: " + score + " điểm.");
-        location.reload(); // Reload để cập nhật bảng xếp hạng
+        location.reload();
     });
 };
 
@@ -213,4 +214,9 @@ window.speakText = function(text, questionIndex, mon) {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('load-data-btn').onclick = window.loadData;
     document.getElementById('start-btn').onclick = window.startQuiz;
+    
+    // Tự động cập nhật bảng xếp hạng khi đổi môn
+    document.getElementById('subject-select').addEventListener('change', function() {
+        window.renderLeaderboard(this.value);
+    });
 });
