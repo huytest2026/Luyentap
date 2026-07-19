@@ -1,9 +1,14 @@
 const AppState = {
-    allQuizData: [], userPermissions: [], rankings: [],
-    currentQuizData: [], timerInterval: null,
-    correctCount: 0, wrongCount: 0
+    allQuizData: [], 
+    userPermissions: [], 
+    rankings: [],
+    currentQuizData: [], 
+    timerInterval: null,
+    correctCount: 0, 
+    wrongCount: 0
 };
 
+// --- CÀI ĐẶT GIAO DIỆN ---
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -15,23 +20,23 @@ const AppState = {
     document.head.appendChild(style);
 })();
 
-// Hàm renderQuiz an toàn
+// --- HÀM RENDER QUIZ ---
 window.renderQuiz = function() {
     const container = document.getElementById('quiz');
     container.innerHTML = '';
     
-    AppState.currentQuizData.forEach((q, index) => {
+    AppState.currentQuizData.forEach(function(q, index) {
         const div = document.createElement('div');
         div.className = 'quiz-card';
         
         const qText = document.createElement('p');
-        qText.innerHTML = `<strong>Câu ${index + 1}:</strong> ${q["Nội dung câu hỏi"] || ""}`;
+        qText.innerHTML = '<strong>Câu ' + (index + 1) + ':</strong> ' + (q["Nội dung câu hỏi"] || "");
         div.appendChild(qText);
         
-        ['A', 'B', 'C', 'D'].forEach(opt => {
+        ['A', 'B', 'C', 'D'].forEach(function(opt) {
             const optDiv = document.createElement('div');
             optDiv.className = 'option-box';
-            optDiv.innerText = `${opt}: ${q['Đáp án ' + opt]}`;
+            optDiv.innerText = opt + ': ' + (q['Đáp án ' + opt] || "");
             
             optDiv.onclick = function() {
                 const isCorrect = (q['Đáp án ' + opt] === q['Đáp án đúng']);
@@ -44,14 +49,15 @@ window.renderQuiz = function() {
     });
 };
 
+// --- CÁC HÀM TIỆN ÍCH ---
 window.startTimer = function(minutes) {
     let time = minutes * 60;
     const display = document.getElementById('timer-display');
     clearInterval(AppState.timerInterval);
-    AppState.timerInterval = setInterval(() => {
+    AppState.timerInterval = setInterval(function() {
         const m = Math.floor(time / 60);
         const s = time % 60;
-        display.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+        display.innerText = m + ':' + (s < 10 ? '0' : '') + s;
         if (time <= 0) { 
             clearInterval(AppState.timerInterval); 
             alert("Hết giờ!"); 
@@ -80,48 +86,67 @@ window.loadData = function() {
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
     const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
     const script = document.createElement('script');
-    script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
+    script.src = API_URL + '?ma=' + encodeURIComponent(maHS) + '&callback=handleQuizData';
     document.body.appendChild(script);
 };
 
-// Hàm updateTopicList được viết lại an toàn
+// --- CẬP NHẬT CHỦ ĐỀ (Sửa lại hoàn toàn) ---
 window.updateTopicList = function() {
     const mon = document.getElementById('subject-select').value;
     const maHS = document.getElementById('student-code').value.trim();
     const container = document.getElementById('topic-container');
+    
     if (!container || !mon) return;
 
-    const allowed = AppState.userPermissions
-        .filter(p => String(p.maHS) === maHS && p.mon === mon)
-        .map(p => p.chuDe);
+    // Lọc quyền
+    const allowed = [];
+    AppState.userPermissions.forEach(function(p) {
+        if (String(p.maHS) === maHS && p.mon === mon) {
+            allowed.push(p.chuDe);
+        }
+    });
 
-    const topics = [...new Set(AppState.allQuizData
-        .filter(i => i.Môn === mon)
-        .map(i => i['Chủ đề']))];
+    // Lọc chủ đề
+    const topics = [];
+    AppState.allQuizData.forEach(function(i) {
+        if (i.Môn === mon && !topics.includes(i['Chủ đề'])) {
+            topics.push(i['Chủ đề']);
+        }
+    });
 
-    container.innerHTML = topics.map(topic => {
+    // Tạo HTML
+    let html = '';
+    topics.forEach(function(topic) {
         const isChecked = allowed.includes(topic) ? 'checked' : 'disabled';
-        return `<label><input type="checkbox" name="topic" value="${topic}" ${isChecked}> ${topic}</label>`;
-    }).join('<br>');
+        html += '<label><input type="checkbox" name="topic" value="' + topic + '" ' + isChecked + '> ' + topic + '</label><br>';
+    });
+    
+    container.innerHTML = html;
 };
 
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelected = document.getElementById('level-select').value;
-    const selected = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
     
-    if (!selected.length) return alert("Vui lòng chọn chủ đề!");
+    const checkboxes = document.querySelectorAll('input[name="topic"]:checked');
+    const selected = [];
+    checkboxes.forEach(function(cb) { selected.push(cb.value); });
     
-    let filtered = AppState.allQuizData.filter(i => 
-        i.Môn === mon && selected.includes(i['Chủ đề']) && String(i.Level) === String(levelSelected)
-    );
+    if (selected.length === 0) return alert("Vui lòng chọn chủ đề!");
+    
+    const filtered = AppState.allQuizData.filter(function(i) {
+        return i.Môn === mon && selected.includes(i['Chủ đề']) && String(i.Level) === String(levelSelected);
+    });
     
     if (filtered.length === 0) return alert("Không có câu hỏi! Kiểm tra lại cột Level (1, 2, 3).");
     
-    AppState.currentQuizData = filtered.sort(() => 0.5 - Math.random()).slice(0, 10);
-    AppState.correctCount = 0; AppState.wrongCount = 0;
+    AppState.currentQuizData = filtered.sort(function() { return 0.5 - Math.random(); }).slice(0, 10);
+    AppState.correctCount = 0; 
+    AppState.wrongCount = 0;
+    
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
+    
     window.renderQuiz();
     window.startTimer(15);
 };
@@ -139,7 +164,7 @@ window.submitQuiz = function() {
     location.reload();
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('load-data-btn').onclick = window.loadData;
     document.getElementById('start-btn').onclick = window.startQuiz;
 });
