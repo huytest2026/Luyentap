@@ -108,7 +108,7 @@ window.speakText = function(text, questionIndex, mon) {
         window.speechSynthesis.cancel();
         
         // Thay thế dấu _ bằng "chỗ trống" để máy đọc tự nhiên hơn
-        let cleanText = text.replace(/_+/g, " chỗ trống ");
+        let cleanText = text.replace(/_+/g, "  ");
         let fullText = "Câu " + (questionIndex + 1) + ". " + cleanText;
         
         const utterance = new SpeechSynthesisUtterance(fullText);
