@@ -3,7 +3,7 @@ const AppState = {
     allQuizData: [], userPermissions: [], rankings: [],
     currentQuizData: [], timerInterval: null,
     correctCount: 0, wrongCount: 0,
-    wrongQuestions: [] // Mảng lưu câu sai
+    wrongQuestions: []
 };
 
 // --- CÀI ĐẶT GIAO DIỆN ---
@@ -15,7 +15,6 @@ const AppState = {
         .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
         .option-box:hover { background: #e9ecef; border-color: #adb5bd; }
         
-        /* CSS cho phần giải thích */
         .explanation-box { 
             margin-top: 15px; padding: 12px; background: #fff3cd; border-left: 5px solid #ffc107; 
             border-radius: 4px; display: none; color: #856404; font-size: 0.95em; line-height: 1.4;
@@ -136,10 +135,10 @@ window.renderQuiz = function() {
         const type = (item.loai || "").toLowerCase().trim();
         const safeQuestion = escapeHTML(item.question);
         
-        // Lấy giải thích từ cột "Diễn giải" trong Google Sheet
-        const giaiThichText = item["Diễn giải"] || ""; 
-        const explanationHtml = (giaiThichText) ? 
-            `<div class="explanation-box" id="explanation-${i}"><b>💡 Giải thích:</b> ${escapeHTML(giaiThichText)}</div>` : '';
+        // --- LOGIC MỚI: Tự động tìm cột giải thích ---
+        const textGiaiThich = item.giai_thich || item.giaiThich || item.explain || item.explanation || item["Diễn giải"] || "";
+        const explanationHtml = (textGiaiThich) ? 
+            `<div class="explanation-box" id="explanation-${i}"><b>💡 Giải thích:</b> ${escapeHTML(textGiaiThich)}</div>` : '';
 
         const speakBtn = (subjectValue === 'Tiếng anh') ? 
             `<button onclick="window.speakText('${safeQuestion.replace(/'/g, "\\'")}', ${i}, '${subjectValue}')" class="speaker-btn">🔊 Nghe</button>` : '';
@@ -193,7 +192,7 @@ window.checkVoca = function(i, correctAnswer) {
         document.getElementById('count-wrong').innerText = AppState.wrongCount;
         input.value = correctAnswer;
         AppState.wrongQuestions.push(AppState.currentQuizData[i]);
-        if (explanationDiv) explanationDiv.style.display = 'block'; // Hiện giải thích nếu sai
+        if (explanationDiv) explanationDiv.style.display = 'block';
     }
     input.disabled = true;
 };
