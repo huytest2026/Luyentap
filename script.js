@@ -109,7 +109,13 @@ window.speakText = function(text, questionIndex) {
         let cleanText = text.replace(/_+/g, " "); 
         let fullText = "Câu " + (questionIndex + 1) + ". " + cleanText;
         const utterance = new SpeechSynthesisUtterance(fullText);
-        utterance.lang = 'vi-VN'; 
+        // 2. Tự động chọn giọng đọc theo môn học
+        if (mon === 'Tiếng anh') {
+            utterance.lang = 'en-US'; // Đọc tiếng Anh chuẩn
+        } else {
+            utterance.lang = 'vi-VN'; // Đọc tiếng Việt
+        }
+
         window.speechSynthesis.speak(utterance);
     }
 };
