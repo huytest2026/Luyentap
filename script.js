@@ -103,12 +103,17 @@ window.renderQuiz = function() {
     }).join('');
 };
 
-window.speakText = function(text, questionIndex) {
+window.speakText = function(text, questionIndex, mon) { // Thêm tham số 'mon' (môn học)
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        let cleanText = text.replace(/_+/g, " "); 
+
+        // 1. Thay thế dấu _ hoặc các khoảng trống đặc biệt bằng từ "chỗ trống"
+        // Để máy đọc nghe tự nhiên hơn: "I go to ... school" -> "I go to chỗ trống school"
+        let cleanText = text.replace(/_+/g, " chỗ trống ");
+        
         let fullText = "Câu " + (questionIndex + 1) + ". " + cleanText;
         const utterance = new SpeechSynthesisUtterance(fullText);
+
         // 2. Tự động chọn giọng đọc theo môn học
         if (mon === 'Tiếng anh') {
             utterance.lang = 'en-US'; // Đọc tiếng Anh chuẩn
