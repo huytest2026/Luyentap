@@ -2,51 +2,26 @@
 const AppState = {
     allQuizData: [], userPermissions: [], rankings: [],
     currentQuizData: [], timerInterval: null,
-    correctCount: 0, wrongCount: 0
+    correctCount: 0, wrongCount: 0,
+    wrongQuestions: [] // MỚI: Mảng lưu câu sai
 };
 
-// --- CÀI ĐẶT GIAO DIỆN (ĐÃ TỐI ƯU ĐỂ DỄ NHÌN) ---
+// --- CÀI ĐẶT GIAO DIỆN ---
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
-        /* Khung chứa nội dung chính */
         .container { background: #e4cbf5; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
-        
-        /* Khung câu hỏi */
-        .quiz-card {
-            background: #ffffff; 
-            border: 2px solid #540606;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        }
-
-        /* Ô đáp án */
-        .option-box {
-            background: #f8f9fa;
-            border: 1px solid #540606;
-            border-radius: 8px;
-            padding: 12px 15px;
-            margin: 8px 0;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            font-weight: 500;
-        }
-
-        /* Hiệu ứng di chuột */
-        .option-box:hover {
-            background: #e9ecef;
-            border-color: #adb5bd;
-        }
-
-        /* Bảng xếp hạng */
+        .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
+        .option-box:hover { background: #e9ecef; border-color: #adb5bd; }
         .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
         .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
         .medal { font-size: 1.2em; margin-right: 10px; }
         .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
         .time-text { font-size: 0.8em; color: #888; display: block; }
         .speaker-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; }
+        /* Nút làm lại câu sai */
+        #retry-wrong-btn { background: #d9534f; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
     `;
     document.head.appendChild(style);
 })();
@@ -111,7 +86,7 @@ window.handleQuizData = function(data) {
 window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
-    localStorage.setItem('saved_maHS', maHS); // Lưu mã
+    localStorage.setItem('saved_maHS', maHS);
     const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
@@ -121,6 +96,19 @@ window.loadData = function() {
 };
 
 // --- QUIZ LOGIC ---
+// MỚI: Hàm làm lại câu sai
+window.retryWrongAnswers = function() {
+    if (AppState.wrongQuestions.length === 0) return;
+    AppState.currentQuizData = AppState.wrongQuestions;
+    AppState.correctCount = 0; AppState.wrongCount = 0;
+    AppState.wrongQuestions = []; // Reset sau khi bắt đầu lại
+    document.getElementById('start-screen').style.display = 'none';
+    document.getElementById('quiz-screen').style.display = 'block';
+    window.renderQuiz();
+    const mon = document.getElementById('subject-select').value;
+    window.startTimer(mon === 'Toán' ? 10 : 5); // Thời gian ngắn hơn cho ôn tập
+};
+
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
     const selected = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
@@ -129,6 +117,7 @@ window.startQuiz = function() {
     let filtered = AppState.allQuizData.filter(i => i.mon === mon && selected.includes(i.chuDe));
     AppState.currentQuizData = filtered.sort(() => 0.5 - Math.random()).slice(0, limit);
     AppState.correctCount = 0; AppState.wrongCount = 0;
+    AppState.wrongQuestions = []; // Reset câu sai khi bắt đầu quiz mới
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
     window.renderQuiz();
@@ -155,6 +144,7 @@ window.checkAnswer = function(i, selectedKey, element, selectedText) {
     const quizItem = AppState.currentQuizData[i];
     const correctValue = String(quizItem.correct).trim();
     const isCorrect = (selectedText.trim() === correctValue) || (selectedKey.toLowerCase() === correctValue.toLowerCase());
+    
     element.style.backgroundColor = isCorrect ? '#d4edda' : '#f8d7da';
     const allBoxes = element.parentElement.querySelectorAll('.option-box');
     allBoxes.forEach(box => {
@@ -163,8 +153,15 @@ window.checkAnswer = function(i, selectedKey, element, selectedText) {
         if (['a','b','c','d'].includes(correctValue.toLowerCase())) correctContent = quizItem[correctValue.toLowerCase()];
         if (box.innerText.trim() === String(correctContent).trim()) box.style.backgroundColor = '#d4edda';
     });
-    if (isCorrect) { AppState.correctCount++; document.getElementById('count-correct').innerText = AppState.correctCount; }
-    else { AppState.wrongCount++; document.getElementById('count-wrong').innerText = AppState.wrongCount; }
+
+    if (isCorrect) { 
+        AppState.correctCount++; 
+        document.getElementById('count-correct').innerText = AppState.correctCount; 
+    } else { 
+        AppState.wrongCount++; 
+        document.getElementById('count-wrong').innerText = AppState.wrongCount; 
+        AppState.wrongQuestions.push(quizItem); // Lưu câu sai
+    }
 };
 
 window.checkVoca = function(i, correctAnswer) {
@@ -176,6 +173,7 @@ window.checkVoca = function(i, correctAnswer) {
         input.style.backgroundColor = '#f8d7da'; AppState.wrongCount++;
         document.getElementById('count-wrong').innerText = AppState.wrongCount;
         input.value = correctAnswer;
+        AppState.wrongQuestions.push(AppState.currentQuizData[i]); // Lưu câu sai
     }
     input.disabled = true;
 };
@@ -187,12 +185,28 @@ window.submitQuiz = function() {
     let score = (mon === 'Toán') ? correct : (correct * 0.5);
     score = parseFloat(score.toFixed(1));
     const dataToSend = { maHS: document.getElementById('student-code').value, score: score, total: AppState.currentQuizData.length, mon: mon };
+    
     fetch("https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec", {
         method: "POST", mode: "no-cors", body: JSON.stringify(dataToSend)
     }).then(() => { 
         alert("Nộp bài thành công! Bạn được: " + score + " điểm."); 
         document.getElementById('quiz-screen').style.display = 'none';
-        document.getElementById('start-screen').style.display = 'block';
+        
+        // Hiển thị nút làm lại nếu có câu sai
+        const startScreen = document.getElementById('start-screen');
+        startScreen.style.display = 'block';
+        
+        // Xóa nút cũ nếu tồn tại
+        const oldBtn = document.getElementById('retry-wrong-btn');
+        if (oldBtn) oldBtn.remove();
+        
+        if (AppState.wrongQuestions.length > 0) {
+            const btn = document.createElement('button');
+            btn.id = 'retry-wrong-btn';
+            btn.innerText = `Làm lại ${AppState.wrongQuestions.length} câu sai`;
+            btn.onclick = window.retryWrongAnswers;
+            startScreen.appendChild(btn);
+        }
         window.loadData(); 
     });
 };
