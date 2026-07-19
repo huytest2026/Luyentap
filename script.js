@@ -25,9 +25,8 @@ window.loadData = function() {
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
     
-    // Thêm xử lý lỗi mạng
     script.onerror = () => {
-        alert("Lỗi tải dữ liệu. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau!");
+        alert("Lỗi tải dữ liệu. Vui lòng kiểm tra kết nối mạng!");
         script.remove();
     };
     
@@ -73,16 +72,13 @@ window.renderQuiz = function() {
     quizDiv.innerHTML = AppState.currentQuizData.map((item, i) => {
         const type = (item.loai || "").toLowerCase().trim();
         const safeQuestion = escapeHTML(item.question);
+        const subjectValue = document.getElementById('subject-select').value;
         
         // Giao diện cho VOCA
         if (type === 'voca') {
             return `
             <div class="quiz-card" style="margin-bottom:20px; padding:20px; border:2px solid #007bff; border-radius:12px; background: #f8fbff;">
-                // Dòng mới cần thay thế:
-<button onclick="window.speakText('${safeQuestion.replace(/'/g, "\\'")}', ${i}, document.getElementById('subject-select').value)" 
-        style="margin-bottom:10px; cursor:pointer;">
-    🔊 Nghe câu hỏi
-</button>
+                <button onclick="window.speakText('${safeQuestion.replace(/'/g, "\\'")}', ${i}, '${subjectValue}')" style="margin-bottom:15px; cursor:pointer; padding:8px 15px; background: #007bff; color: white; border: none; border-radius: 5px;">🔊 Nghe từ vựng</button>
                 <h2 style="margin:5px 0; color: #333;">${safeQuestion}</h2>
                 <div style="font-size: 1.1em; margin-top:10px;">
                     <p>Nghĩa: <b>${escapeHTML(item.correct)}</b></p>
@@ -95,7 +91,7 @@ window.renderQuiz = function() {
         let options = [{k:'a',v:item.a}, {k:'b',v:item.b}, {k:'c',v:item.c}, {k:'d',v:item.d}].sort(() => Math.random() - 0.5);
         return `
         <div class="quiz-card" id="q-card-${i}" style="margin-bottom:15px; padding:15px; border:2px solid #ddd; border-radius:8px;">
-            <button onclick="window.speak('${('Câu ' + (i+1) + ': ' + safeQuestion).replace(/'/g, "\\'")}')" style="margin-bottom:10px; cursor:pointer;">🔊 Nghe câu hỏi</button>
+            <button onclick="window.speakText('${safeQuestion.replace(/'/g, "\\'")}', ${i}, '${subjectValue}')" style="margin-bottom:10px; cursor:pointer;">🔊 Nghe câu hỏi</button>
             <b style="font-size: 1.1em;">Câu ${i+1}: ${safeQuestion}</b><br>
             ${options.map(opt => `
                 <div class="option-box" style="display:block; margin:8px 0; padding:10px; border:1px solid #ccc; border-radius:5px; cursor:pointer; background: white;" 
@@ -117,12 +113,13 @@ window.speakText = function(text, questionIndex, mon) {
         
         const utterance = new SpeechSynthesisUtterance(fullText);
         
-        // Nếu là môn Tiếng Anh thì dùng giọng Anh, ngược lại dùng giọng Việt
+        // Chọn giọng đọc
         utterance.lang = (mon === 'Tiếng anh') ? 'en-US' : 'vi-VN';
         
         window.speechSynthesis.speak(utterance);
     }
 };
+
 // --- 4. Logic chấm điểm ---
 window.checkAnswer = function(i, selectedKey, element, selectedText) {
     const questionData = AppState.currentQuizData[i];
@@ -138,11 +135,10 @@ window.checkAnswer = function(i, selectedKey, element, selectedText) {
         if (currentSubject === 'Tiếng anh' && !isCorrect && box.innerText.trim() === correctValue) {
             box.style.backgroundColor = '#d4edda';
         }
-        box.style.pointerEvents = 'none'; // Khóa không cho chọn tiếp
+        box.style.pointerEvents = 'none';
         box.style.opacity = '0.7';
     });
     
-    // Cập nhật điểm
     if (isCorrect) {
         AppState.correctCount++;
         document.getElementById('count-correct').innerText = AppState.correctCount;
@@ -185,9 +181,8 @@ window.submitQuiz = function() {
     const total = AppState.correctCount + AppState.wrongCount;
     const score = total > 0 ? Math.round((AppState.correctCount / total) * 100) : 0;
     
-    alert(`Hoàn thành bài làm!\nĐiểm số của bạn: ${score}%\nĐúng: ${AppState.correctCount} câu.\nSai: ${AppState.wrongCount} câu.`);
+    alert(`Hoàn thành bài làm!\nĐiểm số: ${score}%\nĐúng: ${AppState.correctCount}\nSai: ${AppState.wrongCount}`);
     
-    // Thay vì reload, ta hiển thị nút "Làm lại" hoặc ẩn bài quiz
     if(confirm("Bạn có muốn làm lại bài mới không?")) {
         location.reload();
     }
