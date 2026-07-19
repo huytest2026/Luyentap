@@ -5,15 +5,48 @@ const AppState = {
     correctCount: 0, wrongCount: 0
 };
 
-// --- CÀI ĐẶT GIAO DIỆN ---
+// --- CÀI ĐẶT GIAO DIỆN (ĐÃ TỐI ƯU ĐỂ DỄ NHÌN) ---
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
-        .leaderboard-container { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
+        /* Khung chứa nội dung chính */
+        .container { background: #ffffff; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
+        
+        /* Khung câu hỏi */
+        .quiz-card {
+            background: #ffffff; 
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        /* Ô đáp án */
+        .option-box {
+            background: #f8f9fa;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            padding: 12px 15px;
+            margin: 8px 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        /* Hiệu ứng di chuột */
+        .option-box:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+
+        /* Bảng xếp hạng */
+        .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
         .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
         .medal { font-size: 1.2em; margin-right: 10px; }
         .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
         .time-text { font-size: 0.8em; color: #888; display: block; }
+        .speaker-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; }
     `;
     document.head.appendChild(style);
 })();
@@ -26,7 +59,6 @@ function escapeHTML(str) {
 }
 
 // --- CÁC HÀM XỬ LÝ DỮ LIỆU ---
-
 window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
     if (!list) return;
@@ -37,7 +69,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
     const qualifiedData = data.filter(item => item.score >= 8);
     if (qualifiedData.length === 0) {
-        list.innerHTML = `<div style="text-align:center; padding: 15px; color: #888;">Chưa có điểm xếp hạng (>= 8).</div>`;
+        list.innerHTML = `<div style="text-align:center; padding: 15px; color: #888;">Chưa có dữ liệu xếp hạng (>= 8).</div>`;
         return;
     }
     const top3 = qualifiedData.sort((a, b) => b.score - a.score).slice(0, 3);
@@ -79,10 +111,7 @@ window.handleQuizData = function(data) {
 window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
-    
-    // LƯU MÃ VÀO LOCALSTORAGE
-    localStorage.setItem('saved_maHS', maHS);
-    
+    localStorage.setItem('saved_maHS', maHS); // Lưu mã
     const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
@@ -91,8 +120,7 @@ window.loadData = function() {
     script.onload = () => script.remove();
 };
 
-// --- CÁC HÀM QUIZ ---
-
+// --- QUIZ LOGIC ---
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
     const selected = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
@@ -152,7 +180,6 @@ window.checkVoca = function(i, correctAnswer) {
     input.disabled = true;
 };
 
-// --- NỘP BÀI KHÔNG CẦN RELOAD ---
 window.submitQuiz = function() {
     clearInterval(AppState.timerInterval);
     const mon = document.getElementById('subject-select').value;
@@ -160,25 +187,14 @@ window.submitQuiz = function() {
     let score = (mon === 'Toán') ? correct : (correct * 0.5);
     score = parseFloat(score.toFixed(1));
     const dataToSend = { maHS: document.getElementById('student-code').value, score: score, total: AppState.currentQuizData.length, mon: mon };
-    
     fetch("https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec", {
         method: "POST", mode: "no-cors", body: JSON.stringify(dataToSend)
     }).then(() => { 
         alert("Nộp bài thành công! Bạn được: " + score + " điểm."); 
         document.getElementById('quiz-screen').style.display = 'none';
         document.getElementById('start-screen').style.display = 'block';
-        window.loadData(); // Tự động cập nhật lại bảng xếp hạng
+        window.loadData(); 
     });
-};
-
-window.speakText = function(text, questionIndex, mon) {
-    if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        let cleanText = text.replace(/_+/g, " ");
-        const utterance = new SpeechSynthesisUtterance("Câu " + (parseInt(questionIndex) + 1) + ". " + cleanText);
-        utterance.lang = (mon === 'Tiếng anh') ? 'en-US' : 'vi-VN';
-        window.speechSynthesis.speak(utterance);
-    }
 };
 
 window.startTimer = function(minutes) {
@@ -194,14 +210,22 @@ window.startTimer = function(minutes) {
     }, 1000);
 };
 
+window.speakText = function(text, questionIndex, mon) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        let cleanText = text.replace(/_+/g, " ");
+        const utterance = new SpeechSynthesisUtterance("Câu " + (parseInt(questionIndex) + 1) + ". " + cleanText);
+        utterance.lang = (mon === 'Tiếng anh') ? 'en-US' : 'vi-VN';
+        window.speechSynthesis.speak(utterance);
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('load-data-btn').onclick = window.loadData;
     document.getElementById('start-btn').onclick = window.startQuiz;
     document.getElementById('subject-select').addEventListener('change', function() {
         window.renderLeaderboard(this.value);
     });
-
-    // TỰ ĐỘNG ĐIỀN MÃ KHI VÀO TRANG
     const savedMa = localStorage.getItem('saved_maHS');
     if (savedMa) {
         document.getElementById('student-code').value = savedMa;
