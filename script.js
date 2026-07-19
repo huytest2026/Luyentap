@@ -10,12 +10,9 @@ const AppState = {
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
-        .container { background: #e4cbf5; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
         .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
         .option-box:hover { background: #e9ecef; border-color: #adb5bd; }
-        .explanation-box { margin-top: 15px; padding: 12px; background: #fff3cd; border-left: 5px solid #ffc107; border-radius: 4px; display: none; color: #856404; font-size: 0.95em; line-height: 1.4; }
-        .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
         .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
         .medal { font-size: 1.2em; margin-right: 10px; }
         .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
@@ -30,7 +27,7 @@ function escapeHTML(str) {
     });
 }
 
-// --- LOGIC MỞ KHÓA LEVEL ---
+// --- LOGIC MỞ KHÓA & TIẾN TRÌNH ---
 window.checkLevelUnlock = function() {
     const maxLevel = parseInt(localStorage.getItem('maxLevelReached') || 1);
     const select = document.getElementById('level-select');
@@ -40,7 +37,6 @@ window.checkLevelUnlock = function() {
     }
 };
 
-// --- THANH TIẾN TRÌNH ---
 window.updateProgressBar = function() {
     const total = AppState.currentQuizData.length;
     const answered = AppState.correctCount + AppState.wrongCount;
@@ -49,7 +45,7 @@ window.updateProgressBar = function() {
     if (bar) bar.style.width = percent + '%';
 };
 
-// --- CÁC HÀM DỮ LIỆU ---
+// --- XỬ LÝ DỮ LIỆU ---
 window.handleQuizData = function(data) {
     if (data.error) return alert("Lỗi: " + data.error);
     AppState.allQuizData = data.questions || [];
@@ -126,15 +122,12 @@ window.startQuiz = function() {
     AppState.currentQuizData = filtered.sort(() => 0.5 - Math.random()).slice(0, limit);
     AppState.correctCount = 0; AppState.wrongCount = 0;
     
-    // Reset Progress Bar
     document.getElementById('progress-bar').style.width = '0%';
-    
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
     
-    // (Lưu ý: Bạn gọi các hàm renderQuiz và startTimer tại đây)
-    window.renderQuiz(); 
-    window.startTimer(mon === 'Toán' ? 15 : 8);
+    window.renderQuiz(); // Hàm này cần tồn tại trong dự án của bạn
+    window.startTimer(mon === 'Toán' ? 15 : 8); // Hàm này cần tồn tại
 };
 
 window.submitQuiz = function() {
@@ -162,7 +155,7 @@ window.submitQuiz = function() {
     });
 };
 
-// CÁC HÀM BỔ TRỢ (Đảm bảo gọi updateProgressBar() sau khi tính đúng/sai)
+// Hàm checkAnswer bạn cần đảm bảo gọi updateProgressBar
 window.checkAnswer = function(i, isCorrect) {
     if(isCorrect) AppState.correctCount++;
     else AppState.wrongCount++;
@@ -170,7 +163,7 @@ window.checkAnswer = function(i, isCorrect) {
     document.getElementById('count-correct').innerText = AppState.correctCount;
     document.getElementById('count-wrong').innerText = AppState.wrongCount;
     
-    window.updateProgressBar(); // <-- Cập nhật thanh tiến trình
+    window.updateProgressBar(); 
 };
 
 document.addEventListener('DOMContentLoaded', () => {
