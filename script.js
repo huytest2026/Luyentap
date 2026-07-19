@@ -10,7 +10,7 @@ const AppState = {
     const style = document.createElement('style');
     style.innerHTML = `
         /* Khung chứa nội dung chính */
-        .container { background: #ffffff; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
+        .container { background: #f8f2fc; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
         
         /* Khung câu hỏi */
         .quiz-card {
