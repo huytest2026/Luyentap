@@ -25,7 +25,7 @@ const AppState = {
         /* Ô đáp án */
         .option-box {
             background: #f8f9fa;
-            border: 1px solid #ced4da;
+            border: 1px solid ##2571db;
             border-radius: 8px;
             padding: 12px 15px;
             margin: 8px 0;
