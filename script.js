@@ -27,48 +27,21 @@ function escapeHTML(str) {
     });
 }
 
-// --- 1. Tải dữ liệu & Xử lý ---
-window.loadData = function() {
-    const maHS = document.getElementById('student-code').value.trim();
-    if (!maHS) return alert("Vui lòng nhập mã học sinh!");
-    
-    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
-    const script = document.createElement('script');
-    script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
-    script.onerror = () => { alert("Lỗi tải dữ liệu!"); script.remove(); };
-    document.body.appendChild(script);
-    script.onload = () => script.remove();
-};
+// --- CÁC HÀM XỬ LÝ (Đưa lên trước để tránh lỗi định nghĩa) ---
 
-window.handleQuizData = function(data) {
-    if (data.error) return alert("Lỗi: " + data.error);
-    AppState.allQuizData = data.questions || [];
-    AppState.userPermissions = data.permissions || [];
-    AppState.rankings = data.rankings || [];
-    window.renderLeaderboard();
-    window.updateTopicList();
-    alert("Tải dữ liệu thành công!");
-};
-
-// --- 2. Bảng xếp hạng (Chỉ hiển thị điểm >= 8) ---
 window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
     if (!list) return;
-
     list.className = "leaderboard-container";
     let data = AppState.rankings;
-
     if (subjectFilter && subjectFilter !== "-- Chọn môn --") {
         data = data.filter(item => item.subject === subjectFilter);
     }
-
     const qualifiedData = data.filter(item => item.score >= 8);
-
     if (qualifiedData.length === 0) {
         list.innerHTML = `<div style="text-align:center; padding: 15px; color: #888;">Chưa có học sinh nào đạt điểm xếp hạng (>= 8).</div>`;
         return;
     }
-
     const top3 = qualifiedData.sort((a, b) => b.score - a.score).slice(0, 3);
     list.innerHTML = top3.map((item, index) => {
         let medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : "🥉");
@@ -84,20 +57,6 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }).join('');
 };
 
-// --- 3. Đồng hồ & Quiz ---
-window.startTimer = function(minutes) {
-    let seconds = minutes * 60;
-    const display = document.getElementById('timer-display');
-    clearInterval(AppState.timerInterval);
-    AppState.timerInterval = setInterval(() => {
-        let m = Math.floor(seconds / 60);
-        let s = seconds % 60;
-        display.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
-        if (seconds <= 0) { clearInterval(AppState.timerInterval); alert("Hết giờ!"); window.submitQuiz(); }
-        seconds--;
-    }, 1000);
-};
-
 window.updateTopicList = function() {
     const mon = document.getElementById('subject-select').value;
     const maHS = document.getElementById('student-code').value.trim();
@@ -111,6 +70,44 @@ window.updateTopicList = function() {
             <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : 'disabled'}> ${escapeHTML(topic)}
         </label>`;
     }).join('');
+};
+
+// --- XỬ LÝ DỮ LIỆU TỪ GOOGLE ---
+window.handleQuizData = function(data) {
+    if (data.error) return alert("Lỗi: " + data.error);
+    AppState.allQuizData = data.questions || [];
+    AppState.userPermissions = data.permissions || [];
+    AppState.rankings = data.rankings || [];
+    
+    // Gọi các hàm đã được định nghĩa ở trên
+    window.renderLeaderboard();
+    window.updateTopicList();
+    alert("Tải dữ liệu thành công!");
+};
+
+window.loadData = function() {
+    const maHS = document.getElementById('student-code').value.trim();
+    if (!maHS) return alert("Vui lòng nhập mã học sinh!");
+    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+    const script = document.createElement('script');
+    script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
+    script.onerror = () => { alert("Lỗi tải dữ liệu!"); script.remove(); };
+    document.body.appendChild(script);
+    script.onload = () => script.remove();
+};
+
+// --- CÁC HÀM CHỨC NĂNG QUIZ ---
+window.startTimer = function(minutes) {
+    let seconds = minutes * 60;
+    const display = document.getElementById('timer-display');
+    clearInterval(AppState.timerInterval);
+    AppState.timerInterval = setInterval(() => {
+        let m = Math.floor(seconds / 60);
+        let s = seconds % 60;
+        display.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+        if (seconds <= 0) { clearInterval(AppState.timerInterval); alert("Hết giờ!"); window.submitQuiz(); }
+        seconds--;
+    }, 1000);
 };
 
 window.startQuiz = function() {
@@ -143,37 +140,20 @@ window.renderQuiz = function() {
     }).join('');
 };
 
-// --- CẬP NHẬT: Hiển thị đáp án đúng khi chọn sai ---
 window.checkAnswer = function(i, selectedKey, element, selectedText) {
     const quizItem = AppState.currentQuizData[i];
     const correctValue = String(quizItem.correct).trim();
     const isCorrect = (selectedText.trim() === correctValue) || (selectedKey.toLowerCase() === correctValue.toLowerCase());
-
-    // 1. Highlight câu trả lời của người dùng
     element.style.backgroundColor = isCorrect ? '#d4edda' : '#f8d7da';
-    
-    // 2. Xác định nội dung đáp án đúng (để bôi xanh)
-    let correctContent = correctValue;
-    if (['a','b','c','d'].includes(correctValue.toLowerCase())) {
-        correctContent = quizItem[correctValue.toLowerCase()];
-    }
-
-    // 3. Vô hiệu hóa tất cả các lựa chọn và bôi xanh đáp án đúng
     const allBoxes = element.parentElement.querySelectorAll('.option-box');
     allBoxes.forEach(box => {
         box.style.pointerEvents = 'none';
-        if (box.innerText.trim() === String(correctContent).trim()) {
-            box.style.backgroundColor = '#d4edda'; // Màu xanh lá cho đáp án đúng
-        }
+        let correctContent = correctValue;
+        if (['a','b','c','d'].includes(correctValue.toLowerCase())) correctContent = quizItem[correctValue.toLowerCase()];
+        if (box.innerText.trim() === String(correctContent).trim()) box.style.backgroundColor = '#d4edda';
     });
-
-    if (isCorrect) { 
-        AppState.correctCount++; 
-        document.getElementById('count-correct').innerText = AppState.correctCount; 
-    } else { 
-        AppState.wrongCount++; 
-        document.getElementById('count-wrong').innerText = AppState.wrongCount; 
-    }
+    if (isCorrect) { AppState.correctCount++; document.getElementById('count-correct').innerText = AppState.correctCount; }
+    else { AppState.wrongCount++; document.getElementById('count-wrong').innerText = AppState.wrongCount; }
 };
 
 window.checkVoca = function(i, correctAnswer) {
@@ -184,7 +164,7 @@ window.checkVoca = function(i, correctAnswer) {
     } else {
         input.style.backgroundColor = '#f8d7da'; AppState.wrongCount++;
         document.getElementById('count-wrong').innerText = AppState.wrongCount;
-        input.value = correctAnswer; // Gợi ý đáp án đúng
+        input.value = correctAnswer;
     }
     input.disabled = true;
 };
