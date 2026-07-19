@@ -15,28 +15,35 @@ const AppState = {
     document.head.appendChild(style);
 })();
 
-function escapeHTML(str) {
-    if (!str) return "";
-    return String(str).replace(/[&<>"']/g, function(m) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
-    });
-}
-
+// Hàm hiển thị câu hỏi (Đã sửa lỗi SyntaxError)
 window.renderQuiz = function() {
     const container = document.getElementById('quiz');
     container.innerHTML = '';
+    
     AppState.currentQuizData.forEach((q, index) => {
         const div = document.createElement('div');
         div.className = 'quiz-card';
-        // Sử dụng chính xác tên cột trong Sheet của bạn
-        div.innerHTML = `
-            <p><strong>Câu ${index + 1}:</strong> ${escapeHTML(q["Nội dung câu hỏi"] || "")}</p>
-            ${['A', 'B', 'C', 'D'].map(opt => `
-                <div class="option-box" onclick="window.checkAnswer(${index}, '${escapeHTML(q['Đáp án ' + opt])}' === '${escapeHTML(q['Đáp án đúng'])}')">
-                    ${opt}: ${escapeHTML(q['Đáp án ' + opt])}
-                </div>
-            `).join('')}
-        `;
+        
+        // Tiêu đề câu hỏi
+        const qText = document.createElement('p');
+        qText.innerHTML = `<strong>Câu ${index + 1}:</strong> ${q["Nội dung câu hỏi"] || ""}`;
+        div.appendChild(qText);
+        
+        // Các đáp án
+        ['A', 'B', 'C', 'D'].forEach(opt => {
+            const optDiv = document.createElement('div');
+            optDiv.className = 'option-box';
+            optDiv.innerText = `${opt}: ${q['Đáp án ' + opt]}`;
+            
+            // Xử lý sự kiện click an toàn
+            optDiv.onclick = function() {
+                const isCorrect = (q['Đáp án ' + opt] === q['Đáp án đúng']);
+                window.checkAnswer(index, isCorrect);
+                // Tạo hiệu ứng click
+                optDiv.style.backgroundColor = isCorrect ? '#d4edda' : '#f8d7da';
+            };
+            div.appendChild(optDiv);
+        });
         container.appendChild(div);
     });
 };
@@ -85,7 +92,7 @@ window.updateTopicList = function() {
     const allowed = AppState.userPermissions.filter(p => String(p.maHS) === maHS && p.mon === mon).map(p => p.chuDe);
     const topics = [...new Set(AppState.allQuizData.filter(i => i.Môn === mon).map(i => i.Chủ đề))];
     container.innerHTML = topics.map(topic => `
-        <label><input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${allowed.includes(topic) ? 'checked' : 'disabled'}> ${escapeHTML(topic)}</label>
+        <label><input type="checkbox" name="topic" value="${topic}" ${allowed.includes(topic) ? 'checked' : 'disabled'}> ${topic}</label>
     `).join('<br>');
 };
 
@@ -96,7 +103,6 @@ window.startQuiz = function() {
     
     if (!selected.length) return alert("Vui lòng chọn chủ đề!");
     
-    // Lưu ý: Cột Level trong Sheet của bạn phải khớp dạng số (1, 2, 3)
     let filtered = AppState.allQuizData.filter(i => 
         i.Môn === mon && selected.includes(i['Chủ đề']) && String(i.Level) === String(levelSelected)
     );
