@@ -113,7 +113,7 @@ window.startQuiz = function() {
     let filtered = AppState.allQuizData.filter(i => 
         i.mon === mon && 
         selected.includes(i.chuDe) && 
-        String(i.level) === String(levelSelected)
+        String(i.level).includes(levelSelected)
     );
     
     if (filtered.length === 0) return alert("Không có câu hỏi cho cấp độ này!");
