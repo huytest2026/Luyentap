@@ -2,8 +2,7 @@
 const AppState = {
     allQuizData: [], userPermissions: [], rankings: [],
     currentQuizData: [], timerInterval: null,
-    correctCount: 0, wrongCount: 0,
-    wrongQuestions: []
+    correctCount: 0, wrongCount: 0
 };
 
 // --- CÀI ĐẶT GIAO DIỆN ---
@@ -26,6 +25,42 @@ function escapeHTML(str) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
     });
 }
+
+// --- HÀM RENDER QUIZ & TIMER (Bổ sung) ---
+window.renderQuiz = function() {
+    const container = document.getElementById('quiz');
+    container.innerHTML = '';
+    AppState.currentQuizData.forEach((q, index) => {
+        const div = document.createElement('div');
+        div.className = 'quiz-card';
+        div.innerHTML = `
+            <p><strong>Câu ${index + 1}:</strong> ${escapeHTML(q.cauHoi || "")}</p>
+            ${['A', 'B', 'C', 'D'].map(opt => `
+                <div class="option-box" onclick="window.checkAnswer(${index}, '${escapeHTML(q['dapAn'+opt])}' === '${escapeHTML(q.dapAnDung)}')">
+                    ${opt}: ${escapeHTML(q['dapAn'+opt])}
+                </div>
+            `).join('')}
+        `;
+        container.appendChild(div);
+    });
+};
+
+window.startTimer = function(minutes) {
+    let time = minutes * 60;
+    const display = document.getElementById('timer-display');
+    clearInterval(AppState.timerInterval);
+    AppState.timerInterval = setInterval(() => {
+        const m = Math.floor(time / 60);
+        const s = time % 60;
+        display.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+        if (time <= 0) {
+            clearInterval(AppState.timerInterval);
+            alert("Hết thời gian!");
+            window.submitQuiz();
+        }
+        time--;
+    }, 1000);
+};
 
 // --- LOGIC MỞ KHÓA & TIẾN TRÌNH ---
 window.checkLevelUnlock = function() {
@@ -113,7 +148,7 @@ window.startQuiz = function() {
     let filtered = AppState.allQuizData.filter(i => 
         i.mon === mon && 
         selected.includes(i.chuDe) && 
-        String(i.level).includes(levelSelected)
+        String(i.level) === String(levelSelected)
     );
     
     if (filtered.length === 0) return alert("Không có câu hỏi cho cấp độ này!");
@@ -126,8 +161,8 @@ window.startQuiz = function() {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
     
-    window.renderQuiz(); // Hàm này cần tồn tại trong dự án của bạn
-    window.startTimer(mon === 'Toán' ? 15 : 8); // Hàm này cần tồn tại
+    window.renderQuiz(); 
+    window.startTimer(mon === 'Toán' ? 15 : 8);
 };
 
 window.submitQuiz = function() {
@@ -155,7 +190,6 @@ window.submitQuiz = function() {
     });
 };
 
-// Hàm checkAnswer bạn cần đảm bảo gọi updateProgressBar
 window.checkAnswer = function(i, isCorrect) {
     if(isCorrect) AppState.correctCount++;
     else AppState.wrongCount++;
