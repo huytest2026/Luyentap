@@ -1,133 +1,87 @@
+// --- KHỞI TẠO DỮ LIỆU ---
 const AppState = {
-    allQuizData: [], 
-    userPermissions: [], 
-    rankings: [],
-    currentQuizData: [], 
-    timerInterval: null,
-    correctCount: 0, 
-    wrongCount: 0
+    allQuizData: [], userPermissions: [], rankings: [],
+    currentQuizData: [], timerInterval: null,
+    correctCount: 0, wrongCount: 0
 };
 
-// --- CÀI ĐẶT GIAO DIỆN ---
+// --- HÀM TẠO GIAO DIỆN (CSS) ---
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
         .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; transition: 0.2s; }
         .option-box:hover { background: #e9ecef; }
-        .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
     `;
     document.head.appendChild(style);
 })();
 
-// --- HÀM RENDER QUIZ ---
-window.renderQuiz = function() {
-    const container = document.getElementById('quiz');
-    container.innerHTML = '';
+// --- HÀM NẠP DỮ LIỆU (Đã thêm log để kiểm tra) ---
+window.loadData = function() {
+    console.log("1. Đã bấm nút Tải đề!");
+    const maHS = document.getElementById('student-code').value.trim();
+    if (!maHS) {
+        alert("Vui lòng nhập mã học sinh!");
+        return;
+    }
     
-    AppState.currentQuizData.forEach(function(q, index) {
-        const div = document.createElement('div');
-        div.className = 'quiz-card';
-        
-        const qText = document.createElement('p');
-        qText.innerHTML = '<strong>Câu ' + (index + 1) + ':</strong> ' + (q["Nội dung câu hỏi"] || "");
-        div.appendChild(qText);
-        
-        ['A', 'B', 'C', 'D'].forEach(function(opt) {
-            const optDiv = document.createElement('div');
-            optDiv.className = 'option-box';
-            optDiv.innerText = opt + ': ' + (q['Đáp án ' + opt] || "");
-            
-            optDiv.onclick = function() {
-                const isCorrect = (q['Đáp án ' + opt] === q['Đáp án đúng']);
-                window.checkAnswer(index, isCorrect);
-                optDiv.style.backgroundColor = isCorrect ? '#d4edda' : '#f8d7da';
-            };
-            div.appendChild(optDiv);
-        });
-        container.appendChild(div);
-    });
+    console.log("2. Mã học sinh là: " + maHS);
+    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+    const script = document.createElement('script');
+    
+    // Đính kèm callback để nhận dữ liệu
+    script.src = API_URL + '?ma=' + encodeURIComponent(maHS) + '&callback=handleQuizData';
+    
+    script.onload = function() { console.log("3. Đã kết nối tới Google Script thành công!"); };
+    script.onerror = function() { console.error("3. LỖI: Không thể kết nối tới Google Script!"); };
+    
+    document.body.appendChild(script);
 };
 
-// --- CÁC HÀM TIỆN ÍCH ---
-window.startTimer = function(minutes) {
-    let time = minutes * 60;
-    const display = document.getElementById('timer-display');
-    clearInterval(AppState.timerInterval);
-    AppState.timerInterval = setInterval(function() {
-        const m = Math.floor(time / 60);
-        const s = time % 60;
-        display.innerText = m + ':' + (s < 10 ? '0' : '') + s;
-        if (time <= 0) { 
-            clearInterval(AppState.timerInterval); 
-            alert("Hết giờ!"); 
-            window.submitQuiz(); 
-        }
-        time--;
-    }, 1000);
-};
-
-window.updateProgressBar = function() {
-    const total = AppState.currentQuizData.length;
-    const answered = AppState.correctCount + AppState.wrongCount;
-    document.getElementById('progress-bar').style.width = (total === 0) ? '0%' : ((answered / total) * 100) + '%';
-};
-
+// --- HÀM NHẬN DỮ LIỆU TỪ GOOGLE ---
 window.handleQuizData = function(data) {
-    if (data.error) return alert("Lỗi: " + data.error);
+    console.log("4. Dữ liệu nhận được:", data); // Kiểm tra xem data có về không
+    if (data.error) {
+        alert("Lỗi từ Google: " + data.error);
+        return;
+    }
     AppState.allQuizData = data.questions || [];
     AppState.userPermissions = data.permissions || [];
     AppState.rankings = data.rankings || [];
     window.updateTopicList();
 };
 
-window.loadData = function() {
-    const maHS = document.getElementById('student-code').value.trim();
-    if (!maHS) return alert("Vui lòng nhập mã học sinh!");
-    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
-    const script = document.createElement('script');
-    script.src = API_URL + '?ma=' + encodeURIComponent(maHS) + '&callback=handleQuizData';
-    document.body.appendChild(script);
-};
-
-// --- CẬP NHẬT CHỦ ĐỀ (Sửa lại hoàn toàn) ---
+// --- HÀM CẬP NHẬT CHỦ ĐỀ ---
 window.updateTopicList = function() {
+    console.log("5. Đang cập nhật danh sách chủ đề...");
     const mon = document.getElementById('subject-select').value;
     const maHS = document.getElementById('student-code').value.trim();
     const container = document.getElementById('topic-container');
     
     if (!container || !mon) return;
 
-    // Lọc quyền
     const allowed = [];
     AppState.userPermissions.forEach(function(p) {
-        if (String(p.maHS) === maHS && p.mon === mon) {
-            allowed.push(p.chuDe);
-        }
+        if (String(p.maHS) === maHS && p.mon === mon) allowed.push(p.chuDe);
     });
 
-    // Lọc chủ đề
     const topics = [];
     AppState.allQuizData.forEach(function(i) {
-        if (i.Môn === mon && !topics.includes(i['Chủ đề'])) {
-            topics.push(i['Chủ đề']);
-        }
+        if (i.Môn === mon && !topics.includes(i['Chủ đề'])) topics.push(i['Chủ đề']);
     });
 
-    // Tạo HTML
     let html = '';
     topics.forEach(function(topic) {
         const isChecked = allowed.includes(topic) ? 'checked' : 'disabled';
         html += '<label><input type="checkbox" name="topic" value="' + topic + '" ' + isChecked + '> ' + topic + '</label><br>';
     });
-    
     container.innerHTML = html;
 };
 
+// --- HÀM KHỞI TẠO BÀI THI ---
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelected = document.getElementById('level-select').value;
-    
     const checkboxes = document.querySelectorAll('input[name="topic"]:checked');
     const selected = [];
     checkboxes.forEach(function(cb) { selected.push(cb.value); });
@@ -146,25 +100,45 @@ window.startQuiz = function() {
     
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
-    
     window.renderQuiz();
     window.startTimer(15);
+};
+
+// --- HÀM HIỂN THỊ CÂU HỎI ---
+window.renderQuiz = function() {
+    const container = document.getElementById('quiz');
+    container.innerHTML = '';
+    AppState.currentQuizData.forEach(function(q, index) {
+        const div = document.createElement('div');
+        div.className = 'quiz-card';
+        div.innerHTML = '<p><strong>Câu ' + (index + 1) + ':</strong> ' + (q["Nội dung câu hỏi"] || "") + '</p>';
+        ['A', 'B', 'C', 'D'].forEach(function(opt) {
+            const optDiv = document.createElement('div');
+            optDiv.className = 'option-box';
+            optDiv.innerText = opt + ': ' + (q['Đáp án ' + opt] || "");
+            optDiv.onclick = function() {
+                const isCorrect = (q['Đáp án ' + opt] === q['Đáp án đúng']);
+                optDiv.style.backgroundColor = isCorrect ? '#d4edda' : '#f8d7da';
+                window.checkAnswer(index, isCorrect);
+            };
+            div.appendChild(optDiv);
+        });
+        container.appendChild(div);
+    });
 };
 
 window.checkAnswer = function(i, isCorrect) {
     if(isCorrect) AppState.correctCount++; else AppState.wrongCount++;
     document.getElementById('count-correct').innerText = AppState.correctCount;
     document.getElementById('count-wrong').innerText = AppState.wrongCount;
-    window.updateProgressBar();
+    const total = AppState.currentQuizData.length;
+    const answered = AppState.correctCount + AppState.wrongCount;
+    document.getElementById('progress-bar').style.width = ((answered / total) * 100) + '%';
 };
 
-window.submitQuiz = function() {
-    clearInterval(AppState.timerInterval);
-    alert("Nộp bài thành công! Đúng: " + AppState.correctCount);
-    location.reload();
-};
-
+// --- CÀI ĐẶT SỰ KIỆN ---
 document.addEventListener('DOMContentLoaded', function() {
+    console.log("Trang đã sẵn sàng.");
     document.getElementById('load-data-btn').onclick = window.loadData;
     document.getElementById('start-btn').onclick = window.startQuiz;
 });
