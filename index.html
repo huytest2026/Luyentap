@@ -7,9 +7,13 @@
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #e8eded; }
         .container { background-color: #bbe9f0; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 600px; margin: auto; }
-        .quiz-card { margin-bottom: 15px; padding: 15px; border: 2px solid #ddd; border-radius: 8px; transition: border 0.3s; }
+        .quiz-card { margin-bottom: 15px; padding: 15px; border: 2px solid #ddd; border-radius: 8px; transition: border 0.3s; background: white; }
         .option-box { display: block; margin: 5px 0; padding: 10px; border: 1px solid #eee; border-radius: 4px; cursor: pointer; }
         .option-box:hover { background-color: #f0f0f0; }
+        
+        /* Thanh tiến trình */
+        #progress-container { width: 100%; background: #e0e0e0; height: 12px; border-radius: 6px; margin: 15px 0; overflow: hidden; }
+        #progress-bar { width: 0%; height: 100%; background: #28a745; transition: width 0.4s ease; }
     </style>
 </head>
 <body>
@@ -26,7 +30,6 @@
         <option value="Tiếng anh">Tiếng Anh</option>
     </select>
 
-    <!-- PHẦN MỚI: Chọn cấp độ -->
     <label style="display:block; margin-top:10px;">Chọn cấp độ:</label>
     <select id="level-select" style="width: 100%; padding: 10px; margin: 10px 0;">
         <option value="1">Level 1</option>
@@ -39,7 +42,6 @@
 
     <button id="start-btn" style="width: 100%; padding: 15px; background: #007bff; color: white; border: none; cursor: pointer;">Bắt Đầu Làm Bài</button>
 
-    <!-- Khung bảng xếp hạng -->
     <div id="leaderboard" style="margin-top: 20px; padding: 15px; border: 2px solid red; border-radius: 10px;">
         <h3 style="color: red; margin-top: 0;">🏆 Bảng xếp hạng:</h3>
         <div id="ranking-list">
@@ -53,6 +55,12 @@
         <div>Thời gian: <span id="timer-display" style="color: red;">--:--</span></div>
         <div>Đúng: <span id="count-correct" style="color: green;">0</span> | Sai: <span id="count-wrong" style="color: red;">0</span></div>
     </div>
+    
+    <!-- Thanh tiến trình -->
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+
     <div id="quiz"></div>
     <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer;">Nộp bài</button>
 </div>
