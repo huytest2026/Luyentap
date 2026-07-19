@@ -10,12 +10,12 @@ const AppState = {
     const style = document.createElement('style');
     style.innerHTML = `
         /* Khung chứa nội dung chính */
-        .container { background: #f8f2fc; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
+        .container { background: #e4cbf5; padding: 25px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); max-width: 600px; margin: 20px auto; }
         
         /* Khung câu hỏi */
         .quiz-card {
             background: #ffffff; 
-            border: 2px solid #e0e0e0;
+            border: 2px solid #540606;
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 20px;
@@ -25,7 +25,7 @@ const AppState = {
         /* Ô đáp án */
         .option-box {
             background: #f8f9fa;
-            border: 1px solid ##2571db;
+            border: 1px solid #540606;
             border-radius: 8px;
             padding: 12px 15px;
             margin: 8px 0;
