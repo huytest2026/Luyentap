@@ -26,11 +26,20 @@
         <option value="Tiếng anh">Tiếng Anh</option>
     </select>
 
-    <div id="topic-container" style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; max-height: 150px; overflow-y: auto;"></div>
+    <!-- PHẦN MỚI: Chọn cấp độ -->
+    <label style="display:block; margin-top:10px;">Chọn cấp độ:</label>
+    <select id="level-select" style="width: 100%; padding: 10px; margin: 10px 0;">
+        <option value="1">Level 1</option>
+        <option value="2" disabled>Level 2 (Cần 8đ ở Level 1)</option>
+        <option value="3" disabled>Level 3 (Cần 8đ ở Level 2)</option>
+    </select>
+
+    <label style="display:block; margin-top:10px;">Chọn chủ đề:</label>
+    <div id="topic-container" style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; max-height: 150px; overflow-y: auto; background: #fff;"></div>
 
     <button id="start-btn" style="width: 100%; padding: 15px; background: #007bff; color: white; border: none; cursor: pointer;">Bắt Đầu Làm Bài</button>
 
-    <!-- Khung bảng xếp hạng mới -->
+    <!-- Khung bảng xếp hạng -->
     <div id="leaderboard" style="margin-top: 20px; padding: 15px; border: 2px solid red; border-radius: 10px;">
         <h3 style="color: red; margin-top: 0;">🏆 Bảng xếp hạng:</h3>
         <div id="ranking-list">
