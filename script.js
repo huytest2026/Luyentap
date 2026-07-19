@@ -68,21 +68,24 @@ window.updateTopicList = function() {
 window.renderQuiz = function() {
     const quizDiv = document.getElementById('quiz');
     if (!quizDiv) return;
+    const subjectValue = document.getElementById('subject-select').value;
     
     quizDiv.innerHTML = AppState.currentQuizData.map((item, i) => {
         const type = (item.loai || "").toLowerCase().trim();
         const safeQuestion = escapeHTML(item.question);
-        const subjectValue = document.getElementById('subject-select').value;
         
-        // Giao diện cho VOCA
+        // Giao diện cho VOCA (Có ô nhập)
         if (type === 'voca') {
             return `
-            <div class="quiz-card" style="margin-bottom:20px; padding:20px; border:2px solid #007bff; border-radius:12px; background: #f8fbff;">
+            <div class="quiz-card" id="q-card-${i}" style="margin-bottom:20px; padding:20px; border:2px solid #007bff; border-radius:12px; background: #f8fbff;">
                 <button onclick="window.speakText('${safeQuestion.replace(/'/g, "\\'")}', ${i}, '${subjectValue}')" style="margin-bottom:15px; cursor:pointer; padding:8px 15px; background: #007bff; color: white; border: none; border-radius: 5px;">🔊 Nghe từ vựng</button>
                 <h2 style="margin:5px 0; color: #333;">${safeQuestion}</h2>
                 <div style="font-size: 1.1em; margin-top:10px;">
-                    <p>Nghĩa: <b>${escapeHTML(item.correct)}</b></p>
-                    <p style="color: #666;">Phiên âm: <i>${escapeHTML(item.diengiai || '')}</i></p>
+                    <p>Nghĩa: 
+                        <input type="text" id="input-voca-${i}" placeholder="Nhập nghĩa vào đây..." style="padding:5px; width:60%;">
+                        <button onclick="window.checkVoca(${i}, '${escapeHTML(item.correct).replace(/'/g, "\\'")}')" style="padding:5px 10px; cursor:pointer;">Kiểm tra</button>
+                    </p>
+                    <p style="color: #666; display:none;" id="result-voca-${i}">Đáp án: <b>${escapeHTML(item.correct)}</b></p>
                 </div>
             </div>`;
         }
@@ -103,21 +106,43 @@ window.renderQuiz = function() {
     }).join('');
 };
 
+// --- Hàm phát âm thanh ---
 window.speakText = function(text, questionIndex, mon) {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         
-        // Thay thế dấu _ bằng "chỗ trống" để máy đọc tự nhiên hơn
+        // Thay thế toàn bộ dấu _ bằng khoảng trắng để không bị đọc là "underscore"
         let cleanText = text.replace(/_+/g, " ");
         let fullText = "Câu " + (questionIndex + 1) + ". " + cleanText;
+        
         const utterance = new SpeechSynthesisUtterance(fullText);
-        // Chọn giọng đọc
+        
+        // Chọn giọng đọc theo môn học
         utterance.lang = (mon === 'Tiếng anh') ? 'en-US' : 'vi-VN';
+        
         window.speechSynthesis.speak(utterance);
     }
 };
 
 // --- 4. Logic chấm điểm ---
+window.checkVoca = function(i, correctAnswer) {
+    const inputField = document.getElementById(`input-voca-${i}`);
+    const resultDisplay = document.getElementById(`result-voca-${i}`);
+    const userInput = inputField.value.trim();
+    
+    if (userInput.toLowerCase() === correctAnswer.toLowerCase()) {
+        inputField.style.backgroundColor = '#d4edda';
+        AppState.correctCount++;
+        document.getElementById('count-correct').innerText = AppState.correctCount;
+    } else {
+        inputField.style.backgroundColor = '#f8d7da';
+        resultDisplay.style.display = 'block';
+        AppState.wrongCount++;
+        document.getElementById('count-wrong').innerText = AppState.wrongCount;
+    }
+    inputField.disabled = true;
+};
+
 window.checkAnswer = function(i, selectedKey, element, selectedText) {
     const questionData = AppState.currentQuizData[i];
     const correctValue = String(questionData.correct).trim();
