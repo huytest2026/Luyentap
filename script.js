@@ -19,9 +19,6 @@ const AppState = {
         .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
         .medal { font-size: 1.2em; margin-right: 10px; }
         .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
-        .time-text { font-size: 0.8em; color: #888; display: block; }
-        .speaker-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; }
-        #retry-wrong-btn { background: #d9534f; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
     `;
     document.head.appendChild(style);
 })();
@@ -38,15 +35,18 @@ window.checkLevelUnlock = function() {
     const maxLevel = parseInt(localStorage.getItem('maxLevelReached') || 1);
     const select = document.getElementById('level-select');
     if (!select) return;
-    
-    // Mở khóa các option theo cấp độ đạt được
     for (let i = 0; i < select.options.length; i++) {
-        if (i < maxLevel) {
-            select.options[i].disabled = false;
-        } else {
-            select.options[i].disabled = true;
-        }
+        select.options[i].disabled = (i + 1) > maxLevel;
     }
+};
+
+// --- THANH TIẾN TRÌNH ---
+window.updateProgressBar = function() {
+    const total = AppState.currentQuizData.length;
+    const answered = AppState.correctCount + AppState.wrongCount;
+    const percent = (total === 0) ? 0 : (answered / total) * 100;
+    const bar = document.getElementById('progress-bar');
+    if (bar) bar.style.width = percent + '%';
 };
 
 // --- CÁC HÀM DỮ LIỆU ---
@@ -57,7 +57,7 @@ window.handleQuizData = function(data) {
     AppState.rankings = data.rankings || [];
     window.renderLeaderboard();
     window.updateTopicList();
-    window.checkLevelUnlock(); // Kiểm tra mở khóa khi tải xong data
+    window.checkLevelUnlock();
 };
 
 window.loadData = function() {
@@ -96,17 +96,13 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
     const qualifiedData = data.filter(item => item.score >= 8);
     if (qualifiedData.length === 0) {
-        list.innerHTML = `<div style="text-align:center; padding: 15px; color: #888;">Chưa có dữ liệu xếp hạng (>= 8).</div>`;
+        list.innerHTML = `<p style="color: #666; text-align:center;">Chưa có dữ liệu xếp hạng (>= 8).</p>`;
         return;
     }
     const top3 = qualifiedData.sort((a, b) => b.score - a.score).slice(0, 3);
     list.innerHTML = top3.map((item, index) => {
         let medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : "🥉");
-        return `
-            <div class="leaderboard-item">
-                <div><span class="medal">${medal}</span> <b>${escapeHTML(item.name)}</b></div>
-                <span class="score-badge">${item.score} đ</span>
-            </div>`;
+        return `<div class="leaderboard-item"><div><span class="medal">${medal}</span> <b>${escapeHTML(item.name)}</b></div><span class="score-badge">${item.score} đ</span></div>`;
     }).join('');
 };
 
@@ -118,7 +114,6 @@ window.startQuiz = function() {
     
     if (!selected.length) return alert("Vui lòng chọn chủ đề!");
     
-    // LỌC THEO MÔN, CHỦ ĐỀ VÀ CẤP ĐỘ
     let filtered = AppState.allQuizData.filter(i => 
         i.mon === mon && 
         selected.includes(i.chuDe) && 
@@ -130,10 +125,15 @@ window.startQuiz = function() {
     let limit = (mon === 'Toán') ? 10 : 20;
     AppState.currentQuizData = filtered.sort(() => 0.5 - Math.random()).slice(0, limit);
     AppState.correctCount = 0; AppState.wrongCount = 0;
-    AppState.wrongQuestions = [];
+    
+    // Reset Progress Bar
+    document.getElementById('progress-bar').style.width = '0%';
+    
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
-    window.renderQuiz();
+    
+    // (Lưu ý: Bạn gọi các hàm renderQuiz và startTimer tại đây)
+    window.renderQuiz(); 
     window.startTimer(mon === 'Toán' ? 15 : 8);
 };
 
@@ -145,7 +145,6 @@ window.submitQuiz = function() {
     let score = (mon === 'Toán') ? correct : (correct * 0.5);
     score = parseFloat(score.toFixed(1));
 
-    // LOGIC MỞ KHÓA
     if (score >= 8) {
         let maxLevel = parseInt(localStorage.getItem('maxLevelReached') || 1);
         if (currentLevel >= maxLevel) {
@@ -159,11 +158,20 @@ window.submitQuiz = function() {
         method: "POST", mode: "no-cors", body: JSON.stringify(dataToSend)
     }).then(() => { 
         alert("Nộp bài thành công! Điểm: " + score); 
-        location.reload(); // Tải lại trang để cập nhật bảng xếp hạng và mở khóa
+        location.reload();
     });
 };
 
-// ... (Các hàm khác như renderQuiz, checkAnswer, startTimer, speakText giữ nguyên) ...
+// CÁC HÀM BỔ TRỢ (Đảm bảo gọi updateProgressBar() sau khi tính đúng/sai)
+window.checkAnswer = function(i, isCorrect) {
+    if(isCorrect) AppState.correctCount++;
+    else AppState.wrongCount++;
+    
+    document.getElementById('count-correct').innerText = AppState.correctCount;
+    document.getElementById('count-wrong').innerText = AppState.wrongCount;
+    
+    window.updateProgressBar(); // <-- Cập nhật thanh tiến trình
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('load-data-btn').onclick = window.loadData;
