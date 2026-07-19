@@ -103,13 +103,16 @@ window.renderQuiz = function() {
     }).join('');
 };
 
-window.speak = function(text) {
-    window.speechSynthesis.cancel();
-    const msg = new SpeechSynthesisUtterance(text);
-    msg.lang = 'en-US';
-    window.speechSynthesis.speak(msg);
+window.speakText = function(text, questionIndex) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        let cleanText = text.replace(/_+/g, " "); 
+        let fullText = "Câu " + (questionIndex + 1) + ". " + cleanText;
+        const utterance = new SpeechSynthesisUtterance(fullText);
+        utterance.lang = 'vi-VN'; 
+        window.speechSynthesis.speak(utterance);
+    }
 };
-
 // --- 4. Logic chấm điểm ---
 window.checkAnswer = function(i, selectedKey, element, selectedText) {
     const questionData = AppState.currentQuizData[i];
