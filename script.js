@@ -5,14 +5,12 @@ const AppState = {
     correctCount: 0, wrongCount: 0
 };
 
-// --- CÀI ĐẶT GIAO DIỆN CHUYÊN NGHIỆP (CSS) ---
+// --- CÀI ĐẶT GIAO DIỆN ---
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
         .leaderboard-container { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
-        .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; animation: popIn 0.5s ease-out; }
-        .leaderboard-item:last-child { border-bottom: none; }
-        @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
         .medal { font-size: 1.2em; margin-right: 10px; }
         .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
         .time-text { font-size: 0.8em; color: #888; display: block; }
@@ -27,7 +25,7 @@ function escapeHTML(str) {
     });
 }
 
-// --- CÁC HÀM XỬ LÝ (Đưa lên trước để tránh lỗi định nghĩa) ---
+// --- CÁC HÀM XỬ LÝ DỮ LIỆU ---
 
 window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
@@ -39,7 +37,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
     const qualifiedData = data.filter(item => item.score >= 8);
     if (qualifiedData.length === 0) {
-        list.innerHTML = `<div style="text-align:center; padding: 15px; color: #888;">Chưa có học sinh nào đạt điểm xếp hạng (>= 8).</div>`;
+        list.innerHTML = `<div style="text-align:center; padding: 15px; color: #888;">Chưa có điểm xếp hạng (>= 8).</div>`;
         return;
     }
     const top3 = qualifiedData.sort((a, b) => b.score - a.score).slice(0, 3);
@@ -48,10 +46,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
         let dateDisplay = item.date ? `<span class="time-text">Ngày: ${item.date}</span>` : "";
         return `
             <div class="leaderboard-item">
-                <div>
-                    <span class="medal">${medal}</span> <b>${escapeHTML(item.name)}</b>
-                    ${dateDisplay}
-                </div>
+                <div><span class="medal">${medal}</span> <b>${escapeHTML(item.name)}</b>${dateDisplay}</div>
                 <span class="score-badge">${item.score} đ</span>
             </div>`;
     }).join('');
@@ -72,22 +67,22 @@ window.updateTopicList = function() {
     }).join('');
 };
 
-// --- XỬ LÝ DỮ LIỆU TỪ GOOGLE ---
 window.handleQuizData = function(data) {
     if (data.error) return alert("Lỗi: " + data.error);
     AppState.allQuizData = data.questions || [];
     AppState.userPermissions = data.permissions || [];
     AppState.rankings = data.rankings || [];
-    
-    // Gọi các hàm đã được định nghĩa ở trên
     window.renderLeaderboard();
     window.updateTopicList();
-    alert("Tải dữ liệu thành công!");
 };
 
 window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
+    
+    // LƯU MÃ VÀO LOCALSTORAGE
+    localStorage.setItem('saved_maHS', maHS);
+    
     const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
@@ -96,19 +91,7 @@ window.loadData = function() {
     script.onload = () => script.remove();
 };
 
-// --- CÁC HÀM CHỨC NĂNG QUIZ ---
-window.startTimer = function(minutes) {
-    let seconds = minutes * 60;
-    const display = document.getElementById('timer-display');
-    clearInterval(AppState.timerInterval);
-    AppState.timerInterval = setInterval(() => {
-        let m = Math.floor(seconds / 60);
-        let s = seconds % 60;
-        display.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
-        if (seconds <= 0) { clearInterval(AppState.timerInterval); alert("Hết giờ!"); window.submitQuiz(); }
-        seconds--;
-    }, 1000);
-};
+// --- CÁC HÀM QUIZ ---
 
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
@@ -169,6 +152,7 @@ window.checkVoca = function(i, correctAnswer) {
     input.disabled = true;
 };
 
+// --- NỘP BÀI KHÔNG CẦN RELOAD ---
 window.submitQuiz = function() {
     clearInterval(AppState.timerInterval);
     const mon = document.getElementById('subject-select').value;
@@ -176,9 +160,15 @@ window.submitQuiz = function() {
     let score = (mon === 'Toán') ? correct : (correct * 0.5);
     score = parseFloat(score.toFixed(1));
     const dataToSend = { maHS: document.getElementById('student-code').value, score: score, total: AppState.currentQuizData.length, mon: mon };
+    
     fetch("https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec", {
         method: "POST", mode: "no-cors", body: JSON.stringify(dataToSend)
-    }).then(() => { alert("Nộp bài thành công! Bạn được: " + score + " điểm."); location.reload(); });
+    }).then(() => { 
+        alert("Nộp bài thành công! Bạn được: " + score + " điểm."); 
+        document.getElementById('quiz-screen').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'block';
+        window.loadData(); // Tự động cập nhật lại bảng xếp hạng
+    });
 };
 
 window.speakText = function(text, questionIndex, mon) {
@@ -191,10 +181,30 @@ window.speakText = function(text, questionIndex, mon) {
     }
 };
 
+window.startTimer = function(minutes) {
+    let seconds = minutes * 60;
+    const display = document.getElementById('timer-display');
+    clearInterval(AppState.timerInterval);
+    AppState.timerInterval = setInterval(() => {
+        let m = Math.floor(seconds / 60);
+        let s = seconds % 60;
+        display.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+        if (seconds <= 0) { clearInterval(AppState.timerInterval); alert("Hết giờ!"); window.submitQuiz(); }
+        seconds--;
+    }, 1000);
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('load-data-btn').onclick = window.loadData;
     document.getElementById('start-btn').onclick = window.startQuiz;
     document.getElementById('subject-select').addEventListener('change', function() {
         window.renderLeaderboard(this.value);
     });
+
+    // TỰ ĐỘNG ĐIỀN MÃ KHI VÀO TRANG
+    const savedMa = localStorage.getItem('saved_maHS');
+    if (savedMa) {
+        document.getElementById('student-code').value = savedMa;
+        window.loadData();
+    }
 });
