@@ -78,7 +78,11 @@ window.renderQuiz = function() {
         if (type === 'voca') {
             return `
             <div class="quiz-card" style="margin-bottom:20px; padding:20px; border:2px solid #007bff; border-radius:12px; background: #f8fbff;">
-                <button onclick="window.speak('${escapeHTML(item.question).replace(/'/g, "\\'")}')" style="margin-bottom:15px; cursor:pointer; padding:8px 15px; background: #007bff; color: white; border: none; border-radius: 5px;">🔊 Nghe từ vựng</button>
+                // Dòng mới cần thay thế:
+<button onclick="window.speakText('${safeQuestion.replace(/'/g, "\\'")}', ${i}, document.getElementById('subject-select').value)" 
+        style="margin-bottom:10px; cursor:pointer;">
+    🔊 Nghe câu hỏi
+</button>
                 <h2 style="margin:5px 0; color: #333;">${safeQuestion}</h2>
                 <div style="font-size: 1.1em; margin-top:10px;">
                     <p>Nghĩa: <b>${escapeHTML(item.correct)}</b></p>
