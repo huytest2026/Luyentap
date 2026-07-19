@@ -70,15 +70,26 @@ window.renderQuiz = function() {
     if (!quizDiv) return;
     const subjectValue = document.getElementById('subject-select').value;
     
+    // Logic: Chỉ tạo biến HTML cho nút bấm nếu là môn Tiếng anh
+    const speakBtnHTML = (subjectValue === 'Tiếng anh') ? 
+        `<button onclick="window.speakText(this.getAttribute('data-text'), this.getAttribute('data-index'), '${subjectValue}')" 
+                 data-text="" data-index="" 
+                 style="margin-bottom:15px; cursor:pointer; padding:8px 15px; background: #007bff; color: white; border: none; border-radius: 5px;">
+            🔊 Nghe
+        </button>` : '';
+
     quizDiv.innerHTML = AppState.currentQuizData.map((item, i) => {
         const type = (item.loai || "").toLowerCase().trim();
         const safeQuestion = escapeHTML(item.question);
+        const safeTextForJS = safeQuestion.replace(/'/g, "\\'");
         
-        // Giao diện cho VOCA (Có ô nhập)
+        // Tùy biến nút bấm cho từng loại
+        let currentSpeakBtn = speakBtnHTML.replace('data-text=""', `data-text="${safeTextForJS}"`).replace('data-index=""', `data-index="${i}"`);
+        
         if (type === 'voca') {
             return `
             <div class="quiz-card" id="q-card-${i}" style="margin-bottom:20px; padding:20px; border:2px solid #007bff; border-radius:12px; background: #f8fbff;">
-                <button onclick="window.speakText('${safeQuestion.replace(/'/g, "\\'")}', ${i}, '${subjectValue}')" style="margin-bottom:15px; cursor:pointer; padding:8px 15px; background: #007bff; color: white; border: none; border-radius: 5px;">🔊 Nghe từ vựng</button>
+                ${currentSpeakBtn}
                 <h2 style="margin:5px 0; color: #333;">${safeQuestion}</h2>
                 <div style="font-size: 1.1em; margin-top:10px;">
                     <p>Nghĩa: 
@@ -90,11 +101,10 @@ window.renderQuiz = function() {
             </div>`;
         }
         
-        // Giao diện cho Trắc nghiệm (Quiz)
         let options = [{k:'a',v:item.a}, {k:'b',v:item.b}, {k:'c',v:item.c}, {k:'d',v:item.d}].sort(() => Math.random() - 0.5);
         return `
         <div class="quiz-card" id="q-card-${i}" style="margin-bottom:15px; padding:15px; border:2px solid #ddd; border-radius:8px;">
-            <button onclick="window.speakText('${safeQuestion.replace(/'/g, "\\'")}', ${i}, '${subjectValue}')" style="margin-bottom:10px; cursor:pointer;">🔊 Nghe câu hỏi</button>
+            ${currentSpeakBtn}
             <b style="font-size: 1.1em;">Câu ${i+1}: ${safeQuestion}</b><br>
             ${options.map(opt => `
                 <div class="option-box" style="display:block; margin:8px 0; padding:10px; border:1px solid #ccc; border-radius:5px; cursor:pointer; background: white;" 
@@ -111,13 +121,10 @@ window.speakText = function(text, questionIndex, mon) {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         
-        // Thay thế toàn bộ dấu _ bằng khoảng trắng để không bị đọc là "underscore"
         let cleanText = text.replace(/_+/g, " ");
-        let fullText = "Câu " + (questionIndex + 1) + ". " + cleanText;
+        let fullText = "Câu " + (parseInt(questionIndex) + 1) + ". " + cleanText;
         
         const utterance = new SpeechSynthesisUtterance(fullText);
-        
-        // Chọn giọng đọc theo môn học
         utterance.lang = (mon === 'Tiếng anh') ? 'en-US' : 'vi-VN';
         
         window.speechSynthesis.speak(utterance);
