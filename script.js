@@ -35,6 +35,29 @@ function escapeHTML(str) {
     });
 }
 
+window.addEventListener('DOMContentLoaded', () => {
+    const savedMa = localStorage.getItem('saved_maHS') || 'Huy';
+    const input = document.getElementById('student-code');
+    if (input) input.value = savedMa;
+    
+    loadFromCache(savedMa);
+    window.loadData();
+});
+
+function loadFromCache(maHS) {
+    const cachedData = localStorage.getItem('cache_quiz_data_' + maHS);
+    if (cachedData) {
+        try {
+            const data = JSON.parse(cachedData);
+            AppState.allQuizData = data.questions || [];
+            AppState.userPermissions = data.permissions || [];
+            AppState.rankings = data.rankings || [];
+            window.renderLeaderboard();
+            window.updateTopicList();
+        } catch(e) {}
+    }
+}
+
 window.handleSubjectChange = function() {
     const mon = document.getElementById('subject-select').value;
     const levelContainer = document.getElementById('level-container');
@@ -76,22 +99,26 @@ window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
     localStorage.setItem('saved_maHS', maHS);
+
     const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
-    script.onerror = () => { alert("Lỗi tải dữ liệu!"); script.remove(); };
+    script.onerror = () => { script.remove(); };
     document.body.appendChild(script);
     script.onload = () => script.remove();
 };
 
 window.handleQuizData = function(data) {
-    if (data.error) return alert("Lỗi: " + data.error);
+    if (data.error) return;
     AppState.allQuizData = data.questions || [];
     AppState.userPermissions = data.permissions || [];
     AppState.rankings = data.rankings || [];
+
+    const maHS = document.getElementById('student-code').value.trim();
+    localStorage.setItem('cache_quiz_data_' + maHS, JSON.stringify(data));
+
     window.renderLeaderboard();
     window.updateTopicList();
-    alert("Tải dữ liệu thành công!");
 };
 
 window.renderLeaderboard = function(subjectFilter = null) {
@@ -140,7 +167,9 @@ window.startQuiz = function() {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
     window.renderQuiz();
-    window.startTimer(mon === 'Toán' ? 15 : 8);
+    
+    let totalSeconds = (mon === 'Toán') ? 15 * 60 : 10 * 60;
+    window.startTimerTotal(totalSeconds);
 };
 
 window.renderQuiz = function() {
@@ -154,7 +183,8 @@ window.renderQuiz = function() {
             </div>`;
         }).join('');
 
-        let speakerBtn = (item.mon === 'Tiếng Anh') ? `<button class="speaker-btn" onclick="window.speakText('${escapeHTML(item.question).replace(/'/g, "\\'")}')">🔊 Nghe câu hỏi</button>` : '';
+        // Sử dụng thuộc tính data-question để truyền chuỗi an toàn tuyệt đối, tránh lỗi cú pháp dấu nháy
+        let speakerBtn = (item.mon === 'Tiếng Anh') ? `<button class="speaker-btn" data-question="${escapeHTML(item.question)}" onclick="window.handleSpeak(this)">🔊 Nghe câu hỏi</button>` : '';
 
         return `<div class="quiz-card" id="q-card-${index}">
             <p><b>Câu ${index + 1}:</b> ${escapeHTML(item.question)}</p>
@@ -165,18 +195,38 @@ window.renderQuiz = function() {
     }).join('');
 };
 
+window.handleSpeak = function(btn) {
+    const text = btn.getAttribute('data-question');
+    window.speakText(text);
+};
+
+function getCorrectLetter(item) {
+    const raw = String(item.correct || '').trim();
+    const upper = raw.toUpperCase();
+    if (['A', 'B', 'C', 'D'].includes(upper)) {
+        return upper;
+    }
+    for (let key of ['a', 'b', 'c', 'd']) {
+        if (item[key] && String(item[key]).trim().toLowerCase() === raw.toLowerCase()) {
+            return key.toUpperCase();
+        }
+    }
+    return upper;
+}
+
 window.checkAnswer = function(element, chosen, index) {
     const card = document.getElementById(`q-card-${index}`);
     if (card.getAttribute('data-answered') === 'true') return;
     card.setAttribute('data-answered', 'true');
 
     const item = AppState.currentQuizData[index];
-    const correctOpt = String(item.correct).trim().toUpperCase();
+    const correctOpt = getCorrectLetter(item);
     
     const options = card.querySelectorAll('.option-box');
     options.forEach(opt => {
         opt.style.pointerEvents = 'none';
-        if (opt.textContent.trim().startsWith(correctOpt + '.')) {
+        const optLetter = opt.querySelector('b').textContent.replace('.', '').trim().toUpperCase();
+        if (optLetter === correctOpt) {
             opt.style.backgroundColor = '#d4edda';
             opt.style.borderColor = '#28a745';
         }
@@ -251,11 +301,10 @@ window.retryWrongAnswers = function() {
         <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer; margin-top: 15px;">Nộp bài</button>
     `;
     window.renderQuiz();
-    window.startTimer(10);
+    window.startTimerTotal(AppState.currentQuizData.length * 30);
 };
 
-window.startTimer = function(secondsPerQuestion) {
-    let totalSeconds = AppState.currentQuizData.length * secondsPerQuestion;
+window.startTimerTotal = function(totalSeconds) {
     const display = document.getElementById('timer-display');
     if (!display) return;
     
