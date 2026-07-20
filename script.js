@@ -23,7 +23,8 @@ const AppState = {
         .medal { font-size: 1.2em; margin-right: 10px; }
         .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
         .time-text { font-size: 0.8em; color: #888; display: block; }
-        .speaker-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; }
+        .speaker-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
+        .speaker-btn:hover { background: #5a6268; }
         #retry-wrong-btn { background: #d9534f; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
         
         .passage-box { 
@@ -287,7 +288,6 @@ window.startQuiz = function() {
     let readingTopics = selectedTopics.filter(t => t.toUpperCase().startsWith('DH'));
     let normalTopics = selectedTopics.filter(t => !t.toUpperCase().startsWith('DH'));
 
-    // Lấy câu hỏi đọc hiểu: Bỏ qua kiểm tra level để đảm bảo luôn tải đủ đoạn văn và câu hỏi khi được chọn
     let readingQuestions = AppState.allQuizData.filter(i => {
         const isSameSubject = (i.mon.toLowerCase() === mon.trim().toLowerCase());
         const isTopicMatch = readingTopics.includes(i.chuDe);
@@ -313,11 +313,7 @@ window.startQuiz = function() {
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
-        
         let isDH = item.chuDe && item.chuDe.toUpperCase().startsWith('DH');
-        
-        // Đọc hiểu (DH): Giữ nguyên thứ tự đáp án gốc, không xáo trộn
-        // Chủ đề thường: Xáo trộn ngẫu nhiên vị trí đáp án A, B, C, D
         let shuffledKeys = isDH ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
 
         return {
@@ -363,7 +359,10 @@ window.renderQuiz = function() {
             passageHtml += `
                 <div class="passage-box">
                     <div class="passage-tag">${escapeHTML(code)}</div>
-                    <div style="white-space: pre-line;">${escapeHTML(uniquePassages[code])}</div>
+                    <div>
+                        <button class="speaker-btn" data-question="${escapeHTML(uniquePassages[code])}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
+                    </div>
+                    <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(uniquePassages[code])}</div>
                 </div>
             `;
         }
@@ -381,7 +380,7 @@ window.renderQuiz = function() {
         let explanationText = item.explanation || 'Không có giải thích.';
 
         let speakerBtn = '';
-        if (item.mon.toLowerCase() === 'tiếng anh' && !item.chuDe.toUpperCase().startsWith('DH')) {
+        if (item.mon.toLowerCase() === 'tiếng anh') {
             let chuDeLower = String(item.chuDe || '').toLowerCase();
             let loaiLower = String(item.loai || '').toLowerCase();
             let speakTextContent = questionText;
@@ -396,9 +395,6 @@ window.renderQuiz = function() {
                 if (isVietAnh) {
                     speakTextContent = item._correctKey || questionText;
                     speakerLabel = '🔊 Nghe từ tiếng Anh';
-                } else {
-                    speakTextContent = questionText;
-                    speakerLabel = '🔊 Nghe câu hỏi';
                 }
             }
 
