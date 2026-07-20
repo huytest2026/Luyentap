@@ -374,8 +374,8 @@ window.startTimerTotal = function(totalSeconds) {
 window.speakText = function(text) {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        // Thay thế các dấu gạch dưới (_) bằng dấu ba chấm (...) để tạo khoảng ngưng tự nhiên (pause)
-        let processedText = text.replace(/[_]+/g, ' ... ');
+        // Thay thế các dấu gạch dưới (_) bằng khoảng trắng thường để bỏ qua hoàn toàn, không tạo tiếng lạ
+        let processedText = text.replace(/[_]+/g, ' ');
         let utterance = new SpeechSynthesisUtterance(processedText);
         utterance.lang = 'en-US';
         window.speechSynthesis.speak(utterance);
