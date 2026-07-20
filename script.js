@@ -98,7 +98,6 @@ function cleanKey(str) {
 function normalizeItem(item) {
     if (!item) return null;
     
-    // Nếu item là Object chứa tên cột tường minh từ API
     if (!Array.isArray(item) && typeof item === 'object') {
         const findKey = (possibleNames) => {
             for (let name of possibleNames) {
@@ -131,17 +130,14 @@ function normalizeItem(item) {
         };
     }
     
-    // Nếu item là dạng mảng dữ liệu từ Google Sheets
     let values = Array.isArray(item) ? item : [];
     if (values.length === 0) return null;
 
-    // Bỏ qua dòng tiêu đề (header row) nếu có chữ ID hoặc Môn ở ô đầu tiên
     let v0 = String(values[0] || '').trim().toLowerCase();
     if (v0 === 'id' || v0 === 'môn' || v0 === 'mon') {
         return null;
     }
 
-    // Tự động nhận diện cột A có phải là số thứ tự (ID) hay không
     let hasStt = /^\d+$/.test(String(values[0]).trim());
 
     const getVal = (indexWithoutId) => {
@@ -196,17 +192,17 @@ window.updateLevelOptions = function() {
     const rankings = AppState.rankings || [];
 
     const passedLevel1 = rankings.some(r => {
-        const rMon = String(r.subject || r.mon || '').trim().toLowerCase();
+        const rMon = cleanKey(r.subject || r.mon || '');
         const rLvl = String(r.level || '').trim();
         const rScore = parseFloat(r.score || 0);
-        return rMon === 'tiếng anh' && rLvl.includes('1') && rScore >= 8;
+        return rMon === cleanKey('Tiếng Anh') && rLvl.includes('1') && rScore >= 8;
     });
 
     const passedLevel2 = rankings.some(r => {
-        const rMon = String(r.subject || r.mon || '').trim().toLowerCase();
+        const rMon = cleanKey(r.subject || r.mon || '');
         const rLvl = String(r.level || '').trim();
         const rScore = parseFloat(r.score || 0);
-        return rMon === 'tiếng anh' && rLvl.includes('2') && rScore >= 8;
+        return rMon === cleanKey('Tiếng Anh') && rLvl.includes('2') && rScore >= 8;
     });
 
     for (let option of levelSelect.options) {
@@ -229,17 +225,19 @@ window.updateLevelOptions = function() {
 };
 
 window.updateTopicList = function() {
-    const monSelect = document.getElementById('subject-select').value.trim().toLowerCase();
+    const monSelect = document.getElementById('subject-select').value.trim();
     const maHS = document.getElementById('student-code').value.trim();
     const container = document.getElementById('topic-container');
     if (!container || !monSelect) return;
 
+    const cleanMonSelect = cleanKey(monSelect);
+
     const allowed = AppState.userPermissions
-        .filter(p => String(p.maHS).trim() === maHS && String(p.mon).trim().toLowerCase() === monSelect)
+        .filter(p => String(p.maHS).trim() === maHS && cleanKey(p.mon) === cleanMonSelect)
         .map(p => String(p.chuDe).trim());
 
     const topics = [...new Set(AppState.allQuizData
-        .filter(i => i.mon.toLowerCase() === monSelect && i.question !== '')
+        .filter(i => cleanKey(i.mon) === cleanMonSelect && i.question !== '')
         .map(i => i.chuDe))].filter(topic => topic !== "");
 
     if (topics.length === 0) {
@@ -263,16 +261,26 @@ window.loadData = function() {
     localStorage.setItem('saved_maHS', maHS);
     localStorage.removeItem('cache_quiz_data_' + maHS);
 
+    const container = document.getElementById('topic-container');
+    if (container) container.innerHTML = "Đang tải dữ liệu chủ đề...";
+
     const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
-    script.onerror = () => { script.remove(); };
+    script.onerror = () => { 
+        script.remove(); 
+        if (container) container.innerHTML = "Lỗi kết nối tải dữ liệu.";
+    };
     document.body.appendChild(script);
     script.onload = () => script.remove();
 };
 
 window.handleQuizData = function(data) {
-    if (data.error) return;
+    if (!data || data.error) {
+        const container = document.getElementById('topic-container');
+        if (container) container.innerHTML = "Không thể tải dữ liệu từ máy chủ.";
+        return;
+    }
     
     let lastMon = '';
     let lastChuDe = '';
@@ -336,7 +344,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
     list.className = "leaderboard-container";
     let data = AppState.rankings;
     if (subjectFilter && subjectFilter !== "-- Chọn môn --") {
-        data = data.filter(item => item.subject === subjectFilter);
+        data = data.filter(item => cleanKey(item.subject || item.mon || '') === cleanKey(subjectFilter));
     }
     const qualifiedData = data.filter(item => item.score >= 8);
     if (qualifiedData.length === 0) {
@@ -377,7 +385,7 @@ window.startQuiz = function() {
     let normalTopics = selectedTopics.filter(t => !t.toUpperCase().startsWith('DH'));
 
     let readingQuestions = AppState.allQuizData.filter(i => {
-        const isSameSubject = (i.mon.toLowerCase() === mon.trim().toLowerCase());
+        const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
         const isTopicMatch = readingTopics.includes(i.chuDe);
         return isSameSubject && isTopicMatch && i.question !== '';
     });
@@ -385,9 +393,9 @@ window.startQuiz = function() {
     let normalQuestions = [];
     if (normalTopics.length > 0) {
         let filteredNormal = AppState.allQuizData.filter(i => {
-            const isSameSubject = (i.mon.toLowerCase() === mon.trim().toLowerCase());
+            const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
             const isTopicMatch = normalTopics.includes(i.chuDe);
-            const isLevelMatch = (mon !== 'Tiếng Anh') || (i.level === String(levelSelected).trim());
+            const isLevelMatch = (cleanKey(mon) !== cleanKey('Tiếng Anh')) || (String(i.level).trim() === String(levelSelected).trim());
             return isSameSubject && isTopicMatch && isLevelMatch && i.question !== '';
         });
         normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
@@ -423,7 +431,7 @@ window.startQuiz = function() {
     let totalSeconds = 10 * 60;
     if (isReadingComp) {
         totalSeconds = 22 * 60; 
-    } else if (mon === 'Toán') {
+    } else if (cleanKey(mon) === cleanKey('Toán')) {
         totalSeconds = 15 * 60;
     }
     window.startTimerTotal(totalSeconds);
@@ -468,7 +476,7 @@ window.renderQuiz = function() {
         let explanationText = item.explanation || 'Không có giải thích.';
 
         let speakerBtn = '';
-        if (item.mon.toLowerCase() === 'tiếng anh') {
+        if (cleanKey(item.mon) === cleanKey('Tiếng Anh')) {
             let chuDeLower = String(item.chuDe || '').toLowerCase();
             let loaiLower = String(item.loai || '').toLowerCase();
             let speakTextContent = questionText;
