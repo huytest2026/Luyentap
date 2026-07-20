@@ -108,7 +108,7 @@ function normalizeItem(item) {
         explanation: String(getVal(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai'])).trim(),
         loai: String(getVal(['loai', 'loại'])).trim(),
         level: String(getVal(['level', 'cấp độ', 'cap do'])).trim(),
-        passage: String(getVal(['passage', 'doanvan', 'đoạn văn'])).trim()
+        passage: String(getVal(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content'])).trim()
     };
 }
 
@@ -281,33 +281,45 @@ function getOriginalCorrectKey(item) {
 window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelected = document.getElementById('level-select').value;
-    const selected = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
-    if (!selected.length) return alert("Vui lòng chọn chủ đề!");
+    const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+    if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
     
-    let isReadingComp = selected.some(t => t.toUpperCase().startsWith('DH')) || 
-                        AppState.allQuizData.some(i => selected.includes(i.chuDe) && i.passage !== '');
-    
-    let filtered = AppState.allQuizData.filter(i => {
+    let readingTopics = selectedTopics.filter(t => t.toUpperCase().startsWith('DH'));
+    let normalTopics = selectedTopics.filter(t => !t.toUpperCase().startsWith('DH'));
+
+    // Lấy câu hỏi đọc hiểu: Bỏ qua kiểm tra level để đảm bảo luôn tải đủ đoạn văn và câu hỏi khi được chọn
+    let readingQuestions = AppState.allQuizData.filter(i => {
         const isSameSubject = (i.mon.toLowerCase() === mon.trim().toLowerCase());
-        const isTopicMatch = selected.includes(i.chuDe);
-        const isLevelMatch = (mon !== 'Tiếng Anh') || (i.level === String(levelSelected).trim());
-        return isSameSubject && isTopicMatch && isLevelMatch;
+        const isTopicMatch = readingTopics.includes(i.chuDe);
+        return isSameSubject && isTopicMatch;
     });
 
-    if (filtered.length === 0) return alert("Không tìm thấy câu hỏi phù hợp cho lựa chọn này!");
-
-    let rawSelectedQuestions = [];
-    if (isReadingComp) {
-        rawSelectedQuestions = filtered;
-    } else {
-        let limit = (mon === 'Toán') ? 10 : 20;
-        rawSelectedQuestions = filtered.sort(() => 0.5 - Math.random()).slice(0, limit);
+    let normalQuestions = [];
+    if (normalTopics.length > 0) {
+        let filteredNormal = AppState.allQuizData.filter(i => {
+            const isSameSubject = (i.mon.toLowerCase() === mon.trim().toLowerCase());
+            const isTopicMatch = normalTopics.includes(i.chuDe);
+            const isLevelMatch = (mon !== 'Tiếng Anh') || (i.level === String(levelSelected).trim());
+            return isSameSubject && isTopicMatch && isLevelMatch;
+        });
+        normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
     }
+
+    let rawSelectedQuestions = [...readingQuestions, ...normalQuestions];
+    if (rawSelectedQuestions.length === 0) return alert("Không tìm thấy câu hỏi phù hợp cho lựa chọn này!");
+
+    let isReadingComp = readingTopics.length > 0;
     
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
-        let shuffledKeys = [...validKeys].sort(() => 0.5 - Math.random());
+        
+        let isDH = item.chuDe && item.chuDe.toUpperCase().startsWith('DH');
+        
+        // Đọc hiểu (DH): Giữ nguyên thứ tự đáp án gốc, không xáo trộn
+        // Chủ đề thường: Xáo trộn ngẫu nhiên vị trí đáp án A, B, C, D
+        let shuffledKeys = isDH ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
+
         return {
             ...item,
             _shuffledKeys: shuffledKeys,
@@ -326,7 +338,7 @@ window.startQuiz = function() {
     
     let totalSeconds = 10 * 60;
     if (isReadingComp) {
-        totalSeconds = 12 * 60;
+        totalSeconds = 22 * 60; 
     } else if (mon === 'Toán') {
         totalSeconds = 15 * 60;
     }
@@ -338,14 +350,23 @@ window.renderQuiz = function() {
     if (!container) return;
 
     let passageHtml = '';
-    if (AppState.isReadingComp && AppState.currentQuizData.length > 0 && AppState.currentQuizData[0].passage) {
-        let passageCode = AppState.currentQuizData[0].chuDe;
-        passageHtml = `
-            <div class="passage-box">
-                <div class="passage-tag">${escapeHTML(passageCode)}</div>
-                <div style="white-space: pre-line;">${escapeHTML(AppState.currentQuizData[0].passage)}</div>
-            </div>
-        `;
+    let passageItems = AppState.currentQuizData.filter(i => i.passage && i.passage.trim() !== '');
+    if (passageItems.length > 0) {
+        let uniquePassages = {};
+        passageItems.forEach(item => {
+            if (!uniquePassages[item.chuDe]) {
+                uniquePassages[item.chuDe] = item.passage;
+            }
+        });
+
+        for (let code in uniquePassages) {
+            passageHtml += `
+                <div class="passage-box">
+                    <div class="passage-tag">${escapeHTML(code)}</div>
+                    <div style="white-space: pre-line;">${escapeHTML(uniquePassages[code])}</div>
+                </div>
+            `;
+        }
     }
 
     let questionsHtml = AppState.currentQuizData.map((item, index) => {
@@ -360,7 +381,7 @@ window.renderQuiz = function() {
         let explanationText = item.explanation || 'Không có giải thích.';
 
         let speakerBtn = '';
-        if (item.mon.toLowerCase() === 'tiếng anh' && !AppState.isReadingComp) {
+        if (item.mon.toLowerCase() === 'tiếng anh' && !item.chuDe.toUpperCase().startsWith('DH')) {
             let chuDeLower = String(item.chuDe || '').toLowerCase();
             let loaiLower = String(item.loai || '').toLowerCase();
             let speakTextContent = questionText;
@@ -538,7 +559,8 @@ window.retryWrongAnswers = function() {
     AppState.currentQuizData = AppState.wrongQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
-        let shuffledKeys = [...validKeys].sort(() => 0.5 - Math.random());
+        let isDH = item.chuDe && item.chuDe.toUpperCase().startsWith('DH');
+        let shuffledKeys = isDH ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
         return {
             ...item,
             _shuffledKeys: shuffledKeys,
