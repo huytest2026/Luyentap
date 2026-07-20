@@ -35,6 +35,32 @@ function escapeHTML(str) {
     });
 }
 
+// Tự động tải dữ liệu ngay khi vừa mở trang (với mã mặc định là Huy)
+window.addEventListener('DOMContentLoaded', () => {
+    const savedMa = localStorage.getItem('saved_maHS') || 'Huy';
+    const input = document.getElementById('student-code');
+    if (input) input.value = savedMa;
+    
+    // Tải siêu tốc từ Cache trước nếu có
+    loadFromCache(savedMa);
+    // Sau đó gọi mạng ngầm để cập nhật dữ liệu mới nhất
+    window.loadData();
+});
+
+function loadFromCache(maHS) {
+    const cachedData = localStorage.getItem('cache_quiz_data_' + maHS);
+    if (cachedData) {
+        try {
+            const data = JSON.parse(cachedData);
+            AppState.allQuizData = data.questions || [];
+            AppState.userPermissions = data.permissions || [];
+            AppState.rankings = data.rankings || [];
+            window.renderLeaderboard();
+            window.updateTopicList();
+        } catch(e) {}
+    }
+}
+
 window.handleSubjectChange = function() {
     const mon = document.getElementById('subject-select').value;
     const levelContainer = document.getElementById('level-container');
@@ -76,22 +102,27 @@ window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
     localStorage.setItem('saved_maHS', maHS);
+
     const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
-    script.onerror = () => { alert("Lỗi tải dữ liệu!"); script.remove(); };
+    script.onerror = () => { script.remove(); };
     document.body.appendChild(script);
     script.onload = () => script.remove();
 };
 
 window.handleQuizData = function(data) {
-    if (data.error) return alert("Lỗi: " + data.error);
+    if (data.error) return;
     AppState.allQuizData = data.questions || [];
     AppState.userPermissions = data.permissions || [];
     AppState.rankings = data.rankings || [];
+
+    // Lưu vào localStorage để lần sau mở lên hiển thị tức thì
+    const maHS = document.getElementById('student-code').value.trim();
+    localStorage.setItem('cache_quiz_data_' + maHS, JSON.stringify(data));
+
     window.renderLeaderboard();
     window.updateTopicList();
-    alert("Tải dữ liệu thành công!");
 };
 
 window.renderLeaderboard = function(subjectFilter = null) {
