@@ -98,88 +98,70 @@ function cleanKey(str) {
 function normalizeItem(item) {
     if (!item) return null;
     
-    let values = Array.isArray(item) ? item : Object.values(item);
-    let keys = Array.isArray(item) ? [] : Object.keys(item);
-    
-    const getVal = (possibleKeys, colIndex) => {
-        if (!Array.isArray(item)) {
-            for (let k of possibleKeys) {
-                const cleanK = cleanKey(k);
-                for (let realKey of keys) {
-                    if (cleanKey(realKey) === cleanK) {
-                        if (item[realKey] !== undefined && item[realKey] !== null && String(item[realKey]).trim() !== '') {
-                            return String(item[realKey]).trim();
+    // Nếu item là Object chứa tên cột tường minh từ API
+    if (!Array.isArray(item) && typeof item === 'object') {
+        const findKey = (possibleNames) => {
+            for (let name of possibleNames) {
+                const cleanN = cleanKey(name);
+                for (let realKey of Object.keys(item)) {
+                    if (cleanKey(realKey) === cleanN) {
+                        const val = item[realKey];
+                        if (val !== undefined && val !== null && String(val).trim() !== '') {
+                            return String(val).trim();
                         }
                     }
                 }
             }
+            return '';
+        };
+
+        return {
+            mon: findKey(['mon', 'môn', 'subject']),
+            chuDe: findKey(['chude', 'chủ đề', 'chu de', 'topic']),
+            question: findKey(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi_dung', 'noidung', 'cauhoi', 'cau_hoi', 'cau', 'de_bai', 'de', 'nd', 'content', 'text', 'câu hỏi', 'nội dung câu hỏi', 'đề bài', 'đề']),
+            a: findKey(['a', 'dapan_a', 'dap an a', 'đáp án a', 'option_a']),
+            b: findKey(['b', 'dapan_b', 'dap an b', 'đáp án b', 'option_b']),
+            c: findKey(['c', 'dapan_c', 'dap an c', 'đáp án c', 'option_c']),
+            d: findKey(['d', 'dapan_d', 'dap an d', 'đáp án d', 'option_d']),
+            correct: findKey(['correct', 'dapan_dung', 'dap an dung', 'đáp án đúng', 'dapandung', 'đáp_án_đúng', 'answer']),
+            explanation: findKey(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai', 'giải thích', 'giai thich']),
+            loai: findKey(['loai', 'loại', 'type']),
+            level: findKey(['level', 'cấp độ', 'cap do', 'muc do']),
+            passage: findKey(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content'])
+        };
+    }
+    
+    // Nếu item là dạng mảng dữ liệu từ Sheets
+    let values = Array.isArray(item) ? item : [];
+    let hasStt = false;
+    if (values.length > 0 && /^\d+$/.test(String(values[0]).trim())) {
+        hasStt = true;
+    }
+    
+    const getArrVal = (indexWithoutStt) => {
+        let idx = hasStt ? indexWithoutStt + 1 : indexWithoutStt;
+        if (idx < values.length && values[idx] !== undefined && values[idx] !== null) {
+            return String(values[idx]).trim();
         }
-        if (colIndex !== undefined && values[colIndex] !== undefined && values[colIndex] !== null && String(values[colIndex]).trim() !== '') {
-            return String(values[colIndex]).trim();
+        if (indexWithoutStt < values.length && values[indexWithoutStt] !== undefined && values[indexWithoutStt] !== null) {
+            return String(values[indexWithoutStt]).trim();
         }
         return '';
     };
 
-    const mon = getVal(['mon', 'môn', 'subject'], 1);
-    const chuDe = getVal(['chude', 'chủ đề', 'chu de', 'topic'], 2);
-    
-    const a = getVal(['a', 'dapan_a', 'dap an a', 'đáp án a', 'option_a'], 4);
-    const b = getVal(['b', 'dapan_b', 'dap an b', 'đáp án b', 'option_b'], 5);
-    const c = getVal(['c', 'dapan_c', 'dap an c', 'đáp án c', 'option_c'], 6);
-    const d = getVal(['d', 'dapan_d', 'dap an d', 'đáp án d', 'option_d'], 7);
-    const correct = getVal(['correct', 'dapan_dung', 'dap an dung', 'đáp án đúng', 'dapandung', 'đáp_án_đúng', 'answer'], 8);
-    const explanation = getVal(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai', 'giải thích', 'giai thich'], 9);
-    const loai = getVal(['loai', 'loại', 'type'], 10);
-    const level = getVal(['level', 'cấp độ', 'cap do', 'muc do'], 11);
-    const passage = getVal(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content'], 12);
-
-    // Lấy câu hỏi theo nhiều cách chuẩn hóa
-    let question = getVal(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi_dung', 'noidung', 'cauhoi', 'cau_hoi', 'cau', 'de_bai', 'de', 'nd', 'content', 'text', 'câu hỏi', 'nội dung câu hỏi', 'đề bài', 'đề'], 3);
-
-    // Fallback thông minh: Nếu vẫn trống, tự động tìm ô nào trong hàng không phải là metadata/đáp án để làm câu hỏi
-    if (!question && !Array.isArray(item)) {
-        for (let realKey of keys) {
-            let val = String(item[realKey] || '').trim();
-            let cleanRKey = cleanKey(realKey);
-            if (val && 
-                !cleanRKey.includes('mon') && 
-                !cleanRKey.includes('chude') && 
-                !cleanRKey.includes('dapan') && 
-                !cleanRKey.includes('correct') && 
-                !cleanRKey.includes('giaithich') && 
-                !cleanRKey.includes('loai') && 
-                !cleanRKey.includes('level') && 
-                !cleanRKey.includes('passage') &&
-                val !== a && val !== b && val !== c && val !== d) {
-                question = val;
-                break;
-            }
-        }
-    }
-
-    if (!question && Array.isArray(values)) {
-        for (let i = 0; i < values.length; i++) {
-            let val = String(values[i] || '').trim();
-            if (val && i !== 1 && i !== 2 && val !== a && val !== b && val !== c && val !== d) {
-                question = val;
-                break;
-            }
-        }
-    }
-
     return {
-        mon,
-        chuDe,
-        question,
-        a,
-        b,
-        c,
-        d,
-        correct,
-        explanation,
-        loai,
-        level,
-        passage
+        mon: getArrVal(0),
+        chuDe: getArrVal(1),
+        question: getArrVal(2),
+        a: getArrVal(3),
+        b: getArrVal(4),
+        c: getArrVal(5),
+        d: getArrVal(6),
+        correct: getArrVal(7),
+        explanation: getArrVal(8),
+        loai: getArrVal(9),
+        level: getArrVal(10),
+        passage: getArrVal(11)
     };
 }
 
@@ -289,7 +271,6 @@ window.loadData = function() {
 window.handleQuizData = function(data) {
     if (data.error) return;
     
-    // Xử lý fill-down cho kho câu hỏi (nếu dòng dưới để trống môn/chủ đề thì kế thừa dòng trên)
     let lastMon = '';
     let lastChuDe = '';
     let lastLevel = '';
@@ -320,7 +301,6 @@ window.handleQuizData = function(data) {
         })
         .filter(item => item && item.question !== '' && item.mon !== '');
         
-    // Xử lý fill-down cho bảng phân quyền
     let lastMaHS = '';
     let lastPermMon = '';
     AppState.userPermissions = (data.permissions || []).map(p => {
@@ -370,13 +350,14 @@ window.renderLeaderboard = function(subjectFilter = null) {
 };
 
 function getOriginalCorrectKey(item) {
-    const raw = item.correct;
+    const raw = String(item.correct || '').trim();
+    if (!raw) return '';
     const upper = raw.toUpperCase();
     if (['A', 'B', 'C', 'D'].includes(upper)) {
         return upper.toLowerCase();
     }
     for (let key of ['a', 'b', 'c', 'd']) {
-        if (item[key] && item[key].toLowerCase() === raw.toLowerCase()) {
+        if (item[key] && String(item[key]).trim().toLowerCase() === raw.toLowerCase()) {
             return key;
         }
     }
@@ -473,7 +454,7 @@ window.renderQuiz = function() {
     }
 
     let questionsHtml = AppState.currentQuizData.map((item, index) => {
-        let loaiVal = item.loai.toLowerCase();
+        let loaiVal = (item.loai || '').toLowerCase();
         let hasNoOptions = (!item.a || item.a.trim() === '') &&
                            (!item.b || item.b.trim() === '') &&
                            (!item.c || item.c.trim() === '') &&
@@ -594,7 +575,7 @@ window.checkVocaAnswer = function(index) {
     inputElem.disabled = true;
 
     const item = AppState.currentQuizData[index];
-    const correctVal = item._correctKey.toLowerCase();
+    const correctVal = String(item._correctKey || '').trim().toLowerCase();
 
     const expBox = document.getElementById(`exp-${index}`);
     if (expBox) expBox.style.display = 'block';
