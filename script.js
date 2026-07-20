@@ -4,28 +4,41 @@ const AppState = {
     correctCount: 0, wrongCount: 0, wrongQuestions: []
 };
 
-// Hàm điều khiển ẩn/hiện Level và cập nhật danh sách
+// Đảm bảo hàm này được gắn vào window
 window.handleSubjectChange = function() {
+    console.log("Đã kích hoạt handleSubjectChange");
+    window.updateTopicList();
+    
     const mon = document.getElementById('subject-select').value;
     const levelContainer = document.getElementById('level-container');
-    levelContainer.style.display = (mon === 'Tiếng anh') ? 'block' : 'none';
-    window.updateTopicList();
+    
+    // Ẩn/hiện Level (Lưu ý: khớp chính xác với value trong HTML)
+    levelContainer.style.display = (mon === 'Tiếng Anh') ? 'block' : 'none';
+    
     window.renderLeaderboard(mon);
 };
 
 window.updateTopicList = function() {
-    const mon = document.getElementById('subject-select').value.trim().toLowerCase();
+    // Lấy value từ select và chuyển về chữ thường để so sánh
+    const monSelect = document.getElementById('subject-select').value.toLowerCase();
     const maHS = document.getElementById('student-code').value.trim();
     const container = document.getElementById('topic-container');
-    if (!container || !mon) return;
+    
+    if (!container || !monSelect) return;
 
+    // Lọc dữ liệu: So sánh không phân biệt hoa thường
     const allowed = AppState.userPermissions
-        .filter(p => String(p.maHS).trim() === maHS && String(p.mon).trim().toLowerCase() === mon)
+        .filter(p => String(p.maHS).trim() === maHS && String(p.mon).trim().toLowerCase() === monSelect)
         .map(p => String(p.chuDe).trim());
 
     const topics = [...new Set(AppState.allQuizData
-        .filter(i => String(i.mon).trim().toLowerCase() === mon)
+        .filter(i => String(i.mon).trim().toLowerCase() === monSelect)
         .map(i => String(i.chuDe).trim()))];
+
+    if (topics.length === 0) {
+        container.innerHTML = "Không tìm thấy dữ liệu cho môn này. Hãy kiểm tra lại cột 'Môn' trong file Excel.";
+        return;
+    }
 
     container.innerHTML = topics.map(topic => {
         const isAllowed = allowed.includes(topic);
@@ -35,36 +48,4 @@ window.updateTopicList = function() {
     }).join('');
 };
 
-window.startQuiz = function() {
-    const mon = document.getElementById('subject-select').value;
-    const levelSelected = document.getElementById('level-select').value;
-    const selected = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
-    
-    if (!selected.length) return alert("Vui lòng chọn chủ đề!");
-    
-    let limit = (mon === 'Toán') ? 10 : 20;
-    
-    let filtered = AppState.allQuizData.filter(i => {
-        const isSameSubject = (String(i.mon).trim().toLowerCase() === mon.toLowerCase());
-        const isTopicMatch = selected.includes(String(i.chuDe).trim());
-        // Chỉ lọc Level nếu là Tiếng Anh
-        const isLevelMatch = (mon !== 'Tiếng anh') || (String(i.level).trim() === String(levelSelected).trim());
-        return isSameSubject && isTopicMatch && isLevelMatch;
-    });
-
-    if (filtered.length === 0) return alert("Không tìm thấy câu hỏi phù hợp cho lựa chọn này!");
-
-    AppState.currentQuizData = filtered.sort(() => 0.5 - Math.random()).slice(0, limit);
-    AppState.correctCount = 0; AppState.wrongCount = 0;
-    AppState.wrongQuestions = [];
-    
-    document.getElementById('start-screen').style.display = 'none';
-    document.getElementById('quiz-screen').style.display = 'block';
-    
-    window.renderQuiz();
-    window.startTimer(mon === 'Toán' ? 15 : 8);
-};
-
-// --- CÁC HÀM CŨ GIỮ NGUYÊN (Copy các hàm còn lại vào đây) ---
-// (renderLeaderboard, renderQuiz, checkAnswer, submitQuiz, startTimer, speakText, etc.)
-// ... (Dán toàn bộ các hàm cũ của bạn vào dưới đây)
+// ... Các hàm cũ khác (renderQuiz, startQuiz, submitQuiz,...) vẫn để nguyên bên dưới ...
