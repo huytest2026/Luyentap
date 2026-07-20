@@ -308,20 +308,25 @@ window.renderQuiz = function() {
         let questionText = item.question;
         let explanationText = item.explanation || 'Không có giải thích.';
 
-        // Xử lý nút đọc (speaker) dựa trên môn và loại chủ đề Voca
+        // Xử lý nút đọc (speaker) tự động thông minh hơn
         let speakerBtn = '';
         if (item.mon.toLowerCase() === 'tiếng anh') {
             let chuDeLower = String(item.chuDe || '').toLowerCase();
+            let loaiLower = String(item.loai || '').toLowerCase();
             let speakTextContent = questionText;
             let speakerLabel = '🔊 Nghe câu hỏi';
 
             if (isVoca) {
-                if (chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh')) {
-                    // Đối với Học từ vựng Việt - Anh: đọc phần điền vào (đáp án từ tiếng Anh)
+                // Tự động nhận diện Việt - Anh nếu tên chủ đề, loại có chữ việt anh HOẶC câu hỏi chứa ký tự tiếng Việt (như "Ấm áp")
+                const hasVietnameseChars = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(questionText);
+                const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh') || 
+                                  loaiLower.includes('việt anh') || loaiLower.includes('viet anh') || 
+                                  hasVietnameseChars;
+
+                if (isVietAnh) {
                     speakTextContent = item._correctKey || questionText;
                     speakerLabel = '🔊 Nghe từ tiếng Anh';
-                } else if (chuDeLower.includes('anh việt') || chuDeLower.includes('anh viet')) {
-                    // Đối với Học từ vựng Anh - Việt: đọc câu hỏi như trắc nghiệm
+                } else {
                     speakTextContent = questionText;
                     speakerLabel = '🔊 Nghe câu hỏi';
                 }
