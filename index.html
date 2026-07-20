@@ -16,8 +16,11 @@
 
 <div class="container" id="start-screen">
     <h1>Bài Kiểm Tra Toán Anh</h1>
+    
     <input type="text" id="student-code" placeholder="Nhập MÃ HỌC SINH..." style="width: 100%; padding: 12px; margin-bottom: 10px; box-sizing: border-box;">
-    <button type="button" id="load-data-btn" style="width: 100%; padding: 10px; background: #7e38e0; color: white; border: none; border-radius: 5px; cursor: pointer;">Xác nhận Mã & Tải đề</button>
+    
+    <!-- ĐÃ THÊM onclick="window.loadData()" ĐỂ KÍCH HOẠT TẢI DỮ LIỆU -->
+    <button type="button" id="load-data-btn" onclick="window.loadData()" style="width: 100%; padding: 10px; background: #7e38e0; color: white; border: none; border-radius: 5px; cursor: pointer;">Xác nhận Mã & Tải đề</button>
 
     <label style="display:block; margin-top:10px;">Chọn môn học:</label>
     <select id="subject-select" onchange="window.handleSubjectChange()" style="width: 100%; padding: 10px; margin: 10px 0;">
@@ -38,7 +41,8 @@
     <label style="display:block; margin-top:10px;">Chọn chủ đề:</label>
     <div id="topic-container"></div>
 
-    <button id="start-btn" style="width: 100%; padding: 15px; background: #007bff; color: white; border: none; cursor: pointer;">Bắt Đầu Làm Bài</button>
+    <!-- ĐÃ THÊM onclick="window.startQuiz()" ĐỂ BẮT ĐẦU BÀI THI -->
+    <button type="button" id="start-btn" onclick="window.startQuiz()" style="width: 100%; padding: 15px; background: #007bff; color: white; border: none; cursor: pointer; margin-top: 10px;">Bắt Đầu Làm Bài</button>
 
     <div id="leaderboard" style="margin-top: 20px; padding: 15px; border: 2px solid red; border-radius: 10px;">
         <h3 style="color: red; margin-top: 0;">🏆 Bảng xếp hạng:</h3>
