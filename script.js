@@ -35,15 +35,12 @@ function escapeHTML(str) {
     });
 }
 
-// Tự động tải dữ liệu ngay khi vừa mở trang (với mã mặc định là Huy)
 window.addEventListener('DOMContentLoaded', () => {
     const savedMa = localStorage.getItem('saved_maHS') || 'Huy';
     const input = document.getElementById('student-code');
     if (input) input.value = savedMa;
     
-    // Tải siêu tốc từ Cache trước nếu có
     loadFromCache(savedMa);
-    // Sau đó gọi mạng ngầm để cập nhật dữ liệu mới nhất
     window.loadData();
 });
 
@@ -117,7 +114,6 @@ window.handleQuizData = function(data) {
     AppState.userPermissions = data.permissions || [];
     AppState.rankings = data.rankings || [];
 
-    // Lưu vào localStorage để lần sau mở lên hiển thị tức thì
     const maHS = document.getElementById('student-code').value.trim();
     localStorage.setItem('cache_quiz_data_' + maHS, JSON.stringify(data));
 
@@ -171,7 +167,10 @@ window.startQuiz = function() {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
     window.renderQuiz();
-    window.startTimer(mon === 'Toán' ? 15 : 8);
+    
+    // Cài đặt tổng thời gian chuẩn xác: Toán 15 phút (900 giây), Tiếng Anh 10 phút (600 giây)
+    let totalSeconds = (mon === 'Toán') ? 15 * 60 : 10 * 60;
+    window.startTimerTotal(totalSeconds);
 };
 
 window.renderQuiz = function() {
@@ -282,11 +281,10 @@ window.retryWrongAnswers = function() {
         <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer; margin-top: 15px;">Nộp bài</button>
     `;
     window.renderQuiz();
-    window.startTimer(10);
+    window.startTimerTotal(AppState.currentQuizData.length * 30);
 };
 
-window.startTimer = function(secondsPerQuestion) {
-    let totalSeconds = AppState.currentQuizData.length * secondsPerQuestion;
+window.startTimerTotal = function(totalSeconds) {
     const display = document.getElementById('timer-display');
     if (!display) return;
     
