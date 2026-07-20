@@ -95,43 +95,64 @@ function cleanKey(str) {
     return removeDiacritics(str).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
+// Hàm chuẩn hóa dữ liệu hoàn hảo, hỗ trợ cả tên cột và vị trí cột chuẩn trên Sheets
 function normalizeItem(item) {
-    const getVal = (keys) => {
-        for (let k of keys) {
-            if (item[k] !== undefined && item[k] !== null && String(item[k]).trim() !== '') return item[k];
-            const cleanK = cleanKey(k);
-            const foundKey = Object.keys(item).find(realKey => cleanKey(realKey) === cleanK);
-            if (foundKey && item[foundKey] !== undefined && item[foundKey] !== null && String(item[foundKey]).trim() !== '') return item[foundKey];
+    if (!item) return null;
+    
+    let values = Array.isArray(item) ? item : Object.values(item);
+    let keys = Array.isArray(item) ? [] : Object.keys(item);
+    
+    const getVal = (possibleKeys, colIndex) => {
+        if (!Array.isArray(item)) {
+            for (let k of possibleKeys) {
+                const cleanK = cleanKey(k);
+                for (let realKey of keys) {
+                    if (cleanKey(realKey) === cleanK) {
+                        if (item[realKey] !== undefined && item[realKey] !== null && String(item[realKey]).trim() !== '') {
+                            return String(item[realKey]).trim();
+                        }
+                    }
+                }
+            }
+        }
+        if (colIndex !== undefined && values[colIndex] !== undefined && values[colIndex] !== null && String(values[colIndex]).trim() !== '') {
+            return String(values[colIndex]).trim();
         }
         return '';
     };
 
-    let questionVal = getVal(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi_dung', 'noidung', 'cauhoi', 'cau_hoi', 'cau', 'de_bai', 'de', 'nd', 'content', 'text', 'câu hỏi', 'nội dung câu hỏi', 'đề bài', 'đề']);
+    // Theo đúng cấu trúc Sheets của bạn:
+    // Cột A (0): ID, Cột B (1): Môn, Cột C (2): Chủ đề, Cột D (3): Nội dung câu hỏi
+    // Cột E (4): Đáp án A, Cột F (5): Đáp án B, Cột G (6): Đáp án C, Cột H (7): Đáp án D
+    // Cột I (8): Đáp án đúng, Cột J (9): Diễn giải, Cột K (10): loai, Cột L (11): Level, Cột M (12): passage
     
-    if (!questionVal) {
-        const ignoreKeys = ['mon', 'chude', 'a', 'b', 'c', 'd', 'correct', 'explanation', 'loai', 'level', 'passage', 'stt', 'id', 'ghichu', 'note'];
-        for (let realKey of Object.keys(item)) {
-            const val = String(item[realKey] || '').trim();
-            if (val !== '' && !ignoreKeys.includes(cleanKey(realKey))) {
-                questionVal = val;
-                break;
-            }
-        }
-    }
+    const mon = getVal(['mon', 'môn', 'subject'], 1);
+    const chuDe = getVal(['chude', 'chủ đề', 'chu de', 'topic'], 2);
+    let question = getVal(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi_dung', 'noidung', 'cauhoi', 'cau_hoi', 'cau', 'de_bai', 'de', 'nd', 'content', 'text', 'câu hỏi', 'nội dung câu hỏi', 'đề bài', 'đề'], 3);
+    
+    const a = getVal(['a', 'dapan_a', 'dap an a', 'đáp án a', 'option_a'], 4);
+    const b = getVal(['b', 'dapan_b', 'dap an b', 'đáp án b', 'option_b'], 5);
+    const c = getVal(['c', 'dapan_c', 'dap an c', 'đáp án c', 'option_c'], 6);
+    const d = getVal(['d', 'dapan_d', 'dap an d', 'đáp án d', 'option_d'], 7);
+    const correct = getVal(['correct', 'dapan_dung', 'dap an dung', 'đáp án đúng', 'dapandung', 'đáp_án_đúng', 'answer'], 8);
+    const explanation = getVal(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai', 'giải thích', 'giai thich'], 9);
+    const loai = getVal(['loai', 'loại', 'type'], 10);
+    const level = getVal(['level', 'cấp độ', 'cap do', 'muc do'], 11);
+    const passage = getVal(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content'], 12);
 
     return {
-        mon: String(getVal(['mon', 'môn', 'subject'])).trim(),
-        chuDe: String(getVal(['chude', 'chủ đề', 'chu de', 'topic'])).trim(),
-        question: String(questionVal).trim(),
-        a: String(getVal(['a', 'dapan_a', 'dap an a', 'đáp án a', 'option_a'])).trim(),
-        b: String(getVal(['b', 'dapan_b', 'dap an b', 'đáp án b', 'option_b'])).trim(),
-        c: String(getVal(['c', 'dapan_c', 'dap an c', 'đáp án c', 'option_c'])).trim(),
-        d: String(getVal(['d', 'dapan_d', 'dap an d', 'đáp án d', 'option_d'])).trim(),
-        correct: String(getVal(['correct', 'dapan_dung', 'dap an dung', 'đáp án đúng', 'dapandung', 'đáp_án_đúng', 'answer'])).trim(),
-        explanation: String(getVal(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai', 'giải thích', 'giai thich'])).trim(),
-        loai: String(getVal(['loai', 'loại', 'type'])).trim(),
-        level: String(getVal(['level', 'cấp độ', 'cap do', 'muc do'])).trim(),
-        passage: String(getVal(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content'])).trim()
+        mon,
+        chuDe,
+        question,
+        a,
+        b,
+        c,
+        d,
+        correct,
+        explanation,
+        loai,
+        level,
+        passage
     };
 }
 
@@ -238,10 +259,9 @@ window.loadData = function() {
 
 window.handleQuizData = function(data) {
     if (data.error) return;
-    // LỌC BỎ CÁC DÒNG TRỐNG KHÔNG CÓ NỘI DUNG CÂU HỎI Ở ĐÂY
     AppState.allQuizData = (data.questions || [])
         .map(normalizeItem)
-        .filter(item => item.question !== '' && item.mon !== '');
+        .filter(item => item && item.question !== '' && item.mon !== '');
         
     AppState.userPermissions = data.permissions || [];
     AppState.rankings = data.rankings || [];
