@@ -71,7 +71,7 @@ window.handleSubjectChange = function() {
     window.renderLeaderboard(mon);
 };
 
-// Hàm thông minh quản lý trạng thái khóa/mở Level dựa trên điểm số (>= 8)
+// Cập nhật logic mở khóa Level tự động dựa trên điểm số môn học đạt >= 8
 window.updateLevelOptions = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelect = document.getElementById('level-select');
@@ -81,20 +81,12 @@ window.updateLevelOptions = function() {
 
     const rankings = AppState.rankings || [];
 
-    function hasPassedLevel(lvlNum) {
-        return rankings.some(r => {
-            const rMon = String(r.subject || r.mon || '').trim().toLowerCase();
-            const rLvl = String(r.level || '').trim();
-            const rScore = parseFloat(r.score || 0);
-            
-            const isMatchMon = rMon === mon.trim().toLowerCase();
-            const isMatchLvl = rLvl.includes(String(lvlNum));
-            return isMatchMon && isMatchLvl && rScore >= 8;
-        });
-    }
-
-    const passedLevel1 = hasPassedLevel(1);
-    const passedLevel2 = hasPassedLevel(2);
+    // Kiểm tra xem học sinh đã có bất kỳ bài thi nào đạt điểm >= 8 trong môn này chưa
+    const hasPassedSubject = rankings.some(r => {
+        const rMon = String(r.subject || r.mon || '').trim().toLowerCase();
+        const rScore = parseFloat(r.score || 0);
+        return rMon === mon.trim().toLowerCase() && rScore >= 8;
+    });
 
     for (let option of levelSelect.options) {
         const val = option.value.trim();
@@ -102,11 +94,13 @@ window.updateLevelOptions = function() {
             option.disabled = false;
             option.style.opacity = '1';
         } else if (val.includes('2') || val === '2') {
-            option.disabled = !passedLevel1;
-            option.style.opacity = passedLevel1 ? '1' : '0.4';
+            // Đạt >= 8 điểm môn Tiếng Anh là mở khóa Level 2
+            option.disabled = !hasPassedSubject;
+            option.style.opacity = hasPassedSubject ? '1' : '0.4';
         } else if (val.includes('3') || val === '3') {
-            option.disabled = !passedLevel2;
-            option.style.opacity = passedLevel2 ? '1' : '0.4';
+            // Tạm thời mở Level 3 khi Level 2 đã được mở (hoặc tùy chỉnh tiếp theo)
+            option.disabled = !hasPassedSubject;
+            option.style.opacity = hasPassedSubject ? '1' : '0.4';
         }
     }
 
