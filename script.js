@@ -71,7 +71,7 @@ window.handleSubjectChange = function() {
     window.renderLeaderboard(mon);
 };
 
-// Cập nhật logic mở khóa Level tự động dựa trên điểm số môn học đạt >= 8
+// Logic thông minh phân cấp mở khóa Level 1 -> Level 2 -> Level 3
 window.updateLevelOptions = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelect = document.getElementById('level-select');
@@ -81,11 +81,20 @@ window.updateLevelOptions = function() {
 
     const rankings = AppState.rankings || [];
 
-    // Kiểm tra xem học sinh đã có bất kỳ bài thi nào đạt điểm >= 8 trong môn này chưa
-    const hasPassedSubject = rankings.some(r => {
+    // Kiểm tra học sinh đã đạt điểm >= 8 ở Level 1 chưa
+    const passedLevel1 = rankings.some(r => {
         const rMon = String(r.subject || r.mon || '').trim().toLowerCase();
+        const rLvl = String(r.level || '').trim();
         const rScore = parseFloat(r.score || 0);
-        return rMon === mon.trim().toLowerCase() && rScore >= 8;
+        return rMon === 'tiếng anh' && rLvl.includes('1') && rScore >= 8;
+    });
+
+    // Kiểm tra học sinh đã đạt điểm >= 8 ở Level 2 chưa
+    const passedLevel2 = rankings.some(r => {
+        const rMon = String(r.subject || r.mon || '').trim().toLowerCase();
+        const rLvl = String(r.level || '').trim();
+        const rScore = parseFloat(r.score || 0);
+        return rMon === 'tiếng anh' && rLvl.includes('2') && rScore >= 8;
     });
 
     for (let option of levelSelect.options) {
@@ -94,13 +103,11 @@ window.updateLevelOptions = function() {
             option.disabled = false;
             option.style.opacity = '1';
         } else if (val.includes('2') || val === '2') {
-            // Đạt >= 8 điểm môn Tiếng Anh là mở khóa Level 2
-            option.disabled = !hasPassedSubject;
-            option.style.opacity = hasPassedSubject ? '1' : '0.4';
+            option.disabled = !passedLevel1;
+            option.style.opacity = passedLevel1 ? '1' : '0.4';
         } else if (val.includes('3') || val === '3') {
-            // Tạm thời mở Level 3 khi Level 2 đã được mở (hoặc tùy chỉnh tiếp theo)
-            option.disabled = !hasPassedSubject;
-            option.style.opacity = hasPassedSubject ? '1' : '0.4';
+            option.disabled = !passedLevel2;
+            option.style.opacity = passedLevel2 ? '1' : '0.4';
         }
     }
 
@@ -302,6 +309,7 @@ window.submitQuiz = function() {
     let score = Math.round((AppState.correctCount / total) * 10 * 10) / 10;
     let maHS = document.getElementById('student-code').value.trim();
     let mon = document.getElementById('subject-select').value;
+    let levelSelected = document.getElementById('level-select') ? document.getElementById('level-select').value : 'Level 1';
 
     alert(`Bài làm kết thúc!\nĐúng: ${AppState.correctCount}/${total}\nĐiểm của bạn: ${score} điểm`);
 
@@ -310,7 +318,7 @@ window.submitQuiz = function() {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ maHS: maHS, score: score, total: total, mon: mon })
+        body: JSON.stringify({ maHS: maHS, score: score, total: total, mon: mon, level: levelSelected })
     }).catch(err => console.error("Lỗi gửi kết quả:", err));
 
     let retryBtnHtml = AppState.wrongQuestions.length > 0 ? `<button id="retry-wrong-btn" onclick="window.retryWrongAnswers()">Làm lại các câu sai (${AppState.wrongQuestions.length})</button>` : '';
