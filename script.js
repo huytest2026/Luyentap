@@ -131,37 +131,40 @@ function normalizeItem(item) {
         };
     }
     
-    // Nếu item là dạng mảng dữ liệu từ Sheets
+    // Nếu item là dạng mảng dữ liệu từ Google Sheets
     let values = Array.isArray(item) ? item : [];
-    let hasStt = false;
-    if (values.length > 0 && /^\d+$/.test(String(values[0]).trim())) {
-        hasStt = true;
+    if (values.length === 0) return null;
+
+    // Bỏ qua dòng tiêu đề (header row) nếu có chữ ID hoặc Môn ở ô đầu tiên
+    let v0 = String(values[0] || '').trim().toLowerCase();
+    if (v0 === 'id' || v0 === 'môn' || v0 === 'mon') {
+        return null;
     }
-    
-    const getArrVal = (indexWithoutStt) => {
-        let idx = hasStt ? indexWithoutStt + 1 : indexWithoutStt;
+
+    // Tự động nhận diện cột A có phải là số thứ tự (ID) hay không
+    let hasStt = /^\d+$/.test(String(values[0]).trim());
+
+    const getVal = (indexWithoutId) => {
+        let idx = hasStt ? indexWithoutId + 1 : indexWithoutId;
         if (idx < values.length && values[idx] !== undefined && values[idx] !== null) {
             return String(values[idx]).trim();
-        }
-        if (indexWithoutStt < values.length && values[indexWithoutStt] !== undefined && values[indexWithoutStt] !== null) {
-            return String(values[indexWithoutStt]).trim();
         }
         return '';
     };
 
     return {
-        mon: getArrVal(0),
-        chuDe: getArrVal(1),
-        question: getArrVal(2),
-        a: getArrVal(3),
-        b: getArrVal(4),
-        c: getArrVal(5),
-        d: getArrVal(6),
-        correct: getArrVal(7),
-        explanation: getArrVal(8),
-        loai: getArrVal(9),
-        level: getArrVal(10),
-        passage: getArrVal(11)
+        mon: getVal(0),         // Cột B: Môn
+        chuDe: getVal(1),       // Cột C: Chủ đề
+        question: getVal(2),    // Cột D: Nội dung câu hỏi
+        a: getVal(3),           // Cột E: Đáp án A
+        b: getVal(4),           // Cột F: Đáp án B
+        c: getVal(5),           // Cột G: Đáp án C
+        d: getVal(6),           // Cột H: Đáp án D
+        correct: getVal(7),     // Cột I: Đáp án đúng
+        explanation: getVal(8), // Cột J: Diễn giải
+        loai: getVal(9),        // Cột K: loai
+        level: getVal(10),      // Cột L: Level
+        passage: getVal(11)     // Cột M: passage
     };
 }
 
