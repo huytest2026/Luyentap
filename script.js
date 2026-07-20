@@ -27,17 +27,27 @@ const AppState = {
         #retry-wrong-btn { background: #d9534f; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
         
         .passage-box { 
-            background: #fdfefe; 
-            border: 2px dashed #007bff; 
+            background: #ffffff; 
+            border: 2px solid #540606; 
             border-radius: 12px; 
             padding: 20px; 
             margin-bottom: 20px; 
             font-size: 1.05em; 
             line-height: 1.6; 
             color: #333; 
-            max-height: 350px; 
-            overflow-y: auto; 
-            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+        }
+
+        .passage-tag {
+            display: inline-block;
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            padding: 5px 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            color: #333;
+            font-size: 1em;
         }
 
         input[type="text"], select {
@@ -274,7 +284,6 @@ window.startQuiz = function() {
     const selected = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
     if (!selected.length) return alert("Vui lòng chọn chủ đề!");
     
-    // Kiểm tra xem có chủ đề nào thuộc dạng đọc hiểu (chứa mã DH...) hoặc có cột passage không
     let isReadingComp = selected.some(t => t.toUpperCase().startsWith('DH')) || 
                         AppState.allQuizData.some(i => selected.includes(i.chuDe) && i.passage !== '');
     
@@ -289,7 +298,6 @@ window.startQuiz = function() {
 
     let rawSelectedQuestions = [];
     if (isReadingComp) {
-        // Đọc hiểu: Giữ nguyên thứ tự câu hỏi từ Sheets, không xáo trộn
         rawSelectedQuestions = filtered;
     } else {
         let limit = (mon === 'Toán') ? 10 : 20;
@@ -316,7 +324,6 @@ window.startQuiz = function() {
     document.getElementById('quiz-screen').style.display = 'block';
     window.renderQuiz();
     
-    // Thiết lập thời gian: Đọc hiểu 12 phút, Toán 15 phút, Khác 10 phút
     let totalSeconds = 10 * 60;
     if (isReadingComp) {
         totalSeconds = 12 * 60;
@@ -332,9 +339,10 @@ window.renderQuiz = function() {
 
     let passageHtml = '';
     if (AppState.isReadingComp && AppState.currentQuizData.length > 0 && AppState.currentQuizData[0].passage) {
+        let passageCode = AppState.currentQuizData[0].chuDe;
         passageHtml = `
             <div class="passage-box">
-                <h3 style="margin-top: 0; color: #007bff;">📖 Đoạn văn đọc hiểu (Reading Passage)</h3>
+                <div class="passage-tag">${escapeHTML(passageCode)}</div>
                 <div style="white-space: pre-line;">${escapeHTML(AppState.currentQuizData[0].passage)}</div>
             </div>
         `;
