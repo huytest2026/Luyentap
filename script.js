@@ -149,18 +149,18 @@ function normalizeItem(item) {
     };
 
     return {
-        mon: getVal(0),         // Cột B: Môn
-        chuDe: getVal(1),       // Cột C: Chủ đề
-        question: getVal(2),    // Cột D: Nội dung câu hỏi
-        a: getVal(3),           // Cột E: Đáp án A
-        b: getVal(4),           // Cột F: Đáp án B
-        c: getVal(5),           // Cột G: Đáp án C
-        d: getVal(6),           // Cột H: Đáp án D
-        correct: getVal(7),     // Cột I: Đáp án đúng
-        explanation: getVal(8), // Cột J: Diễn giải
-        loai: getVal(9),        // Cột K: loai
-        level: getVal(10),      // Cột L: Level
-        passage: getVal(11)     // Cột M: passage
+        mon: getVal(0),
+        chuDe: getVal(1),
+        question: getVal(2),
+        a: getVal(3),
+        b: getVal(4),
+        c: getVal(5),
+        d: getVal(6),
+        correct: getVal(7),
+        explanation: getVal(8),
+        loai: getVal(9),
+        level: getVal(10),
+        passage: getVal(11)
     };
 }
 
@@ -476,35 +476,54 @@ window.renderQuiz = function() {
         let explanationText = item.explanation || 'Không có giải thích.';
 
         let speakerBtn = '';
+        let bodyHtml = '';
+
         if (cleanKey(item.mon) === cleanKey('Tiếng Anh')) {
             let chuDeLower = String(item.chuDe || '').toLowerCase();
             let loaiLower = String(item.loai || '').toLowerCase();
-            let speakTextContent = questionText;
-            let speakerLabel = '🔊 Nghe câu hỏi';
-
+            
             if (isVoca) {
                 const hasVietnameseChars = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(questionText);
                 const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh') || 
                                   loaiLower.includes('việt anh') || loaiLower.includes('viet anh') || 
                                   hasVietnameseChars;
+                const isAnhViet = chuDeLower.includes('anh việt') || chuDeLower.includes('anh viet') || 
+                                  loaiLower.includes('anh việt') || loaiLower.includes('anh viet') || 
+                                  (!hasVietnameseChars && !isVietAnh);
+
+                let placeholderText = "Nhập đáp án tiếng Anh...";
+                let speakTextContent = questionText;
+                let speakerLabel = '🔊 Nghe từ tiếng Anh';
 
                 if (isVietAnh) {
-                    speakTextContent = item._correctKey || questionText;
+                    placeholderText = "Nhập đáp án tiếng Anh...";
                     speakerLabel = '🔊 Nghe từ tiếng Anh';
+                    speakTextContent = item._correctKey || questionText;
+                } else if (isAnhViet) {
+                    placeholderText = "Nhập đáp án tiếng Việt...";
+                    speakerLabel = '🔊 Nghe từ tiếng Anh';
+                    speakTextContent = questionText;
                 }
+
+                speakerBtn = `<button class="speaker-btn" data-question="${escapeHTML(speakTextContent)}" onclick="window.handleSpeak(this)">${speakerLabel}</button>`;
+
+                bodyHtml = `
+                    <div style="margin-top: 10px;">
+                        <input type="text" id="voca-input-${index}" placeholder="${placeholderText}">
+                        <button type="button" onclick="window.checkVocaAnswer(${index})" style="margin-top: 8px; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Kiểm tra</button>
+                    </div>
+                `;
+            } else {
+                speakerBtn = `<button class="speaker-btn" data-question="${escapeHTML(questionText)}" onclick="window.handleSpeak(this)">🔊 Nghe câu hỏi</button>`;
+                let keysToRender = item._shuffledKeys.length > 0 ? item._shuffledKeys : ['a', 'b', 'c', 'd'].filter(k => item[k]);
+                bodyHtml = keysToRender.map((optKey, displayIndex) => {
+                    if (!item[optKey]) return '';
+                    let displayLetter = String.fromCharCode(65 + displayIndex);
+                    return `<div class="option-box" data-orig-key="${optKey}" onclick="window.checkAnswer(this, '${optKey}', ${index})">
+                        <b>${displayLetter}.</b> ${escapeHTML(item[optKey])}
+                    </div>`;
+                }).join('');
             }
-
-            speakerBtn = `<button class="speaker-btn" data-question="${escapeHTML(speakTextContent)}" onclick="window.handleSpeak(this)">${speakerLabel}</button>`;
-        }
-
-        let bodyHtml = '';
-        if (isVoca) {
-            bodyHtml = `
-                <div style="margin-top: 10px;">
-                    <input type="text" id="voca-input-${index}" placeholder="Nhập đáp án tiếng Anh...">
-                    <button type="button" onclick="window.checkVocaAnswer(${index})" style="margin-top: 8px; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">Kiểm tra</button>
-                </div>
-            `;
         } else {
             let keysToRender = item._shuffledKeys.length > 0 ? item._shuffledKeys : ['a', 'b', 'c', 'd'].filter(k => item[k]);
             bodyHtml = keysToRender.map((optKey, displayIndex) => {
