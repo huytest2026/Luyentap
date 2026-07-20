@@ -183,7 +183,9 @@ window.renderQuiz = function() {
             </div>`;
         }).join('');
 
-        let speakerBtn = (item.mon === 'Tiếng Anh') ? `<button class="speaker-btn" onclick="window.speakText('${escapeHTML(item.question).replace(/'/g, "\\'")}')">🔊 Nghe câu hỏi</button>` : '';
+        // Sửa lỗi cú pháp bằng cách dùng JSON.stringify để mã hóa an toàn chuỗi đọc phát âm
+        let safeQuestionText = JSON.stringify(item.question || '');
+        let speakerBtn = (item.mon === 'Tiếng Anh') ? `<button class="speaker-btn" onclick='window.speakText(${safeQuestionText})'>🔊 Nghe câu hỏi</button>` : '';
 
         return `<div class="quiz-card" id="q-card-${index}">
             <p><b>Câu ${index + 1}:</b> ${escapeHTML(item.question)}</p>
