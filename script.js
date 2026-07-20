@@ -106,14 +106,15 @@ function normalizeItem(item) {
         return '';
     };
 
-    // Tìm câu hỏi với danh sách từ khóa cực kỳ rộng (bao gồm cả noi_dung, de_bai, nd,...)
     let questionVal = getVal(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi_dung', 'noidung', 'cauhoi', 'cau_hoi', 'cau', 'de_bai', 'de', 'nd', 'content', 'text', 'câu hỏi', 'nội dung câu hỏi', 'đề bài', 'đề']);
+    
+    // Nếu vẫn chưa tìm thấy câu hỏi, tự động quét tất cả các cột không phải cấu hình để lấy nội dung câu hỏi
     if (!questionVal) {
-        // Fallback tự động dò cột nếu tên cột không khớp bất kỳ từ khóa nào phía trên
-        const excluded = ['mon', 'chude', 'a', 'b', 'c', 'd', 'correct', 'explanation', 'loai', 'level', 'passage', 'stt', 'id', 'ghichu', 'note'];
+        const ignoreKeys = ['mon', 'chude', 'a', 'b', 'c', 'd', 'correct', 'explanation', 'loai', 'level', 'passage', 'stt', 'id', 'ghichu', 'note'];
         for (let realKey of Object.keys(item)) {
-            if (!excluded.includes(cleanKey(realKey)) && item[realKey] && String(item[realKey]).trim() !== '') {
-                questionVal = String(item[realKey]).trim();
+            const val = String(item[realKey] || '').trim();
+            if (val !== '' && !ignoreKeys.includes(cleanKey(realKey))) {
+                questionVal = val;
                 break;
             }
         }
@@ -140,24 +141,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('student-code');
     if (input) input.value = savedMa;
     
-    loadFromCache(savedMa);
     window.loadData();
 });
-
-function loadFromCache(maHS) {
-    const cachedData = localStorage.getItem('cache_quiz_data_' + maHS);
-    if (cachedData) {
-        try {
-            const data = JSON.parse(cachedData);
-            AppState.allQuizData = (data.questions || []).map(normalizeItem);
-            AppState.userPermissions = data.permissions || [];
-            AppState.rankings = data.rankings || [];
-            window.renderLeaderboard();
-            window.updateTopicList();
-            window.updateLevelOptions();
-        } catch(e) {}
-    }
-}
 
 window.handleSubjectChange = function() {
     const mon = document.getElementById('subject-select').value;
@@ -242,6 +227,9 @@ window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
     localStorage.setItem('saved_maHS', maHS);
+
+    // Xóa cache cũ để bắt buộc tải dữ liệu mới nhất từ Google Sheets
+    localStorage.removeItem('cache_quiz_data_' + maHS);
 
     const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
     const script = document.createElement('script');
