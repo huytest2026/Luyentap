@@ -71,7 +71,7 @@ window.handleSubjectChange = function() {
     window.renderLeaderboard(mon);
 };
 
-// Logic thông minh phân cấp mở khóa Level 1 -> Level 2 -> Level 3
+// Logic phân cấp mở khóa Level 1 -> Level 2 -> Level 3 (điểm >= 8)
 window.updateLevelOptions = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelect = document.getElementById('level-select');
@@ -81,7 +81,6 @@ window.updateLevelOptions = function() {
 
     const rankings = AppState.rankings || [];
 
-    // Kiểm tra học sinh đã đạt điểm >= 8 ở Level 1 chưa
     const passedLevel1 = rankings.some(r => {
         const rMon = String(r.subject || r.mon || '').trim().toLowerCase();
         const rLvl = String(r.level || '').trim();
@@ -89,7 +88,6 @@ window.updateLevelOptions = function() {
         return rMon === 'tiếng anh' && rLvl.includes('1') && rScore >= 8;
     });
 
-    // Kiểm tra học sinh đã đạt điểm >= 8 ở Level 2 chưa
     const passedLevel2 = rankings.some(r => {
         const rMon = String(r.subject || r.mon || '').trim().toLowerCase();
         const rLvl = String(r.level || '').trim();
@@ -126,9 +124,10 @@ window.updateTopicList = function() {
         .filter(p => String(p.maHS).trim() === maHS && String(p.mon).trim().toLowerCase() === monSelect)
         .map(p => String(p.chuDe).trim());
 
+    // Lọc bỏ triệt để các chuỗi trống hoặc khoảng trắng thừa
     const topics = [...new Set(AppState.allQuizData
         .filter(i => String(i.mon).trim().toLowerCase() === monSelect)
-        .map(i => String(i.chuDe).trim()))];
+        .map(i => String(i.chuDe).trim()))].filter(topic => topic !== "");
 
     if (topics.length === 0) {
         container.innerHTML = "Không tìm thấy chủ đề cho môn này.";
@@ -187,7 +186,8 @@ window.renderLeaderboard = function(subjectFilter = null) {
     list.innerHTML = top3.map((item, index) => {
         let medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : "🥉");
         let dateDisplay = item.date ? `<span class="time-text">Ngày: ${escapeHTML(item.date)}</span>` : "";
-        return `<div class="leaderboard-item"><div><span class="medal">${medal}</span> <b>${escapeHTML(item.name)}</b>${dateDisplay}</div><span class="score-badge">${item.score} đ</span></div>`;
+        let levelDisplay = item.level ? ` - <span style="font-size:0.85em; color:#555;">${escapeHTML(item.level)}</span>` : "";
+        return `<div class="leaderboard-item"><div><span class="medal">${medal}</span> <b>${escapeHTML(item.name)}</b>${levelDisplay}${dateDisplay}</div><span class="score-badge">${item.score} đ</span></div>`;
     }).join('');
 };
 
