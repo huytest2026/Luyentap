@@ -287,12 +287,11 @@ window.startQuiz = function() {
     let readingTopics = selectedTopics.filter(t => t.toUpperCase().startsWith('DH'));
     let normalTopics = selectedTopics.filter(t => !t.toUpperCase().startsWith('DH'));
 
-    // Lấy câu hỏi đọc hiểu và giữ nguyên thứ tự sắp xếp như trong Google Sheets
+    // Lấy câu hỏi đọc hiểu: Bỏ qua kiểm tra level để đảm bảo luôn tải đủ đoạn văn và câu hỏi khi được chọn
     let readingQuestions = AppState.allQuizData.filter(i => {
         const isSameSubject = (i.mon.toLowerCase() === mon.trim().toLowerCase());
         const isTopicMatch = readingTopics.includes(i.chuDe);
-        const isLevelMatch = (mon !== 'Tiếng Anh') || (i.level === String(levelSelected).trim());
-        return isSameSubject && isTopicMatch && isLevelMatch;
+        return isSameSubject && isTopicMatch;
     });
 
     let normalQuestions = [];
@@ -317,7 +316,7 @@ window.startQuiz = function() {
         
         let isDH = item.chuDe && item.chuDe.toUpperCase().startsWith('DH');
         
-        // Bài đọc hiểu (DH): Giữ nguyên thứ tự đáp án gốc, không xáo trộn
+        // Đọc hiểu (DH): Giữ nguyên thứ tự đáp án gốc, không xáo trộn
         // Chủ đề thường: Xáo trộn ngẫu nhiên vị trí đáp án A, B, C, D
         let shuffledKeys = isDH ? validKeys : [...validKeys].sort(() => 0.5 - Math.random());
 
