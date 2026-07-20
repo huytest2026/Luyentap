@@ -24,6 +24,7 @@ const AppState = {
         .time-text { font-size: 0.8em; color: #888; display: block; }
         .speaker-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; }
         #retry-wrong-btn { background: #d9534f; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
+        select option:disabled { color: #aaa; background: #f1f1f1; }
     `;
     document.head.appendChild(style);
 })();
@@ -54,6 +55,7 @@ function loadFromCache(maHS) {
             AppState.rankings = data.rankings || [];
             window.renderLeaderboard();
             window.updateTopicList();
+            window.updateLevelOptions();
         } catch(e) {}
     }
 }
@@ -65,7 +67,52 @@ window.handleSubjectChange = function() {
         levelContainer.style.display = (mon === 'Tiếng Anh') ? 'block' : 'none';
     }
     window.updateTopicList();
+    window.updateLevelOptions();
     window.renderLeaderboard(mon);
+};
+
+// Hàm thông minh quản lý trạng thái khóa/mở Level dựa trên điểm số (>= 8)
+window.updateLevelOptions = function() {
+    const mon = document.getElementById('subject-select').value;
+    const levelSelect = document.getElementById('level-select');
+    if (!levelSelect) return;
+
+    if (mon !== 'Tiếng Anh') return;
+
+    const rankings = AppState.rankings || [];
+
+    function hasPassedLevel(lvlNum) {
+        return rankings.some(r => {
+            const rMon = String(r.subject || r.mon || '').trim().toLowerCase();
+            const rLvl = String(r.level || '').trim();
+            const rScore = parseFloat(r.score || 0);
+            
+            const isMatchMon = rMon === mon.trim().toLowerCase();
+            const isMatchLvl = rLvl.includes(String(lvlNum));
+            return isMatchMon && isMatchLvl && rScore >= 8;
+        });
+    }
+
+    const passedLevel1 = hasPassedLevel(1);
+    const passedLevel2 = hasPassedLevel(2);
+
+    for (let option of levelSelect.options) {
+        const val = option.value.trim();
+        if (val.includes('1') || val === '1') {
+            option.disabled = false;
+            option.style.opacity = '1';
+        } else if (val.includes('2') || val === '2') {
+            option.disabled = !passedLevel1;
+            option.style.opacity = passedLevel1 ? '1' : '0.4';
+        } else if (val.includes('3') || val === '3') {
+            option.disabled = !passedLevel2;
+            option.style.opacity = passedLevel2 ? '1' : '0.4';
+        }
+    }
+
+    if (levelSelect.selectedOptions[0] && levelSelect.selectedOptions[0].disabled) {
+        levelSelect.value = levelSelect.options[0].value;
+    }
 };
 
 window.updateTopicList = function() {
@@ -119,6 +166,7 @@ window.handleQuizData = function(data) {
 
     window.renderLeaderboard();
     window.updateTopicList();
+    window.updateLevelOptions();
 };
 
 window.renderLeaderboard = function(subjectFilter = null) {
@@ -183,7 +231,6 @@ window.renderQuiz = function() {
             </div>`;
         }).join('');
 
-        // Sử dụng thuộc tính data-question để truyền chuỗi an toàn tuyệt đối, tránh lỗi cú pháp dấu nháy
         let speakerBtn = (item.mon === 'Tiếng Anh') ? `<button class="speaker-btn" data-question="${escapeHTML(item.question)}" onclick="window.handleSpeak(this)">🔊 Nghe câu hỏi</button>` : '';
 
         return `<div class="quiz-card" id="q-card-${index}">
