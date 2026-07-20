@@ -303,13 +303,32 @@ window.renderQuiz = function() {
                            (!item.b || item.b.trim() === '') &&
                            (!item.c || item.c.trim() === '') &&
                            (!item.d || item.d.trim() === '');
-        // Tự động nhận diện là dạng điền từ nếu có chữ voca/dien HOẶC không có đáp án A, B, C, D
         let isVoca = loaiVal.includes('voca') || loaiVal.includes('dien') || loaiVal.includes('từ') || hasNoOptions;
         
         let questionText = item.question;
         let explanationText = item.explanation || 'Không có giải thích.';
 
-        let speakerBtn = (item.mon.toLowerCase() === 'tiếng anh') ? `<button class="speaker-btn" data-question="${escapeHTML(questionText)}" onclick="window.handleSpeak(this)">🔊 Nghe câu hỏi</button>` : '';
+        // Xử lý nút đọc (speaker) dựa trên môn và loại chủ đề Voca
+        let speakerBtn = '';
+        if (item.mon.toLowerCase() === 'tiếng anh') {
+            let chuDeLower = String(item.chuDe || '').toLowerCase();
+            let speakTextContent = questionText;
+            let speakerLabel = '🔊 Nghe câu hỏi';
+
+            if (isVoca) {
+                if (chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh')) {
+                    // Đối với Học từ vựng Việt - Anh: đọc phần điền vào (đáp án từ tiếng Anh)
+                    speakTextContent = item._correctKey || questionText;
+                    speakerLabel = '🔊 Nghe từ tiếng Anh';
+                } else if (chuDeLower.includes('anh việt') || chuDeLower.includes('anh viet')) {
+                    // Đối với Học từ vựng Anh - Việt: đọc câu hỏi như trắc nghiệm
+                    speakTextContent = questionText;
+                    speakerLabel = '🔊 Nghe câu hỏi';
+                }
+            }
+
+            speakerBtn = `<button class="speaker-btn" data-question="${escapeHTML(speakTextContent)}" onclick="window.handleSpeak(this)">${speakerLabel}</button>`;
+        }
 
         let bodyHtml = '';
         if (isVoca) {
