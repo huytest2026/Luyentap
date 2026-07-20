@@ -108,7 +108,6 @@ function normalizeItem(item) {
 
     let questionVal = getVal(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi_dung', 'noidung', 'cauhoi', 'cau_hoi', 'cau', 'de_bai', 'de', 'nd', 'content', 'text', 'câu hỏi', 'nội dung câu hỏi', 'đề bài', 'đề']);
     
-    // Nếu vẫn chưa tìm thấy câu hỏi, tự động quét tất cả các cột không phải cấu hình để lấy nội dung câu hỏi
     if (!questionVal) {
         const ignoreKeys = ['mon', 'chude', 'a', 'b', 'c', 'd', 'correct', 'explanation', 'loai', 'level', 'passage', 'stt', 'id', 'ghichu', 'note'];
         for (let realKey of Object.keys(item)) {
@@ -207,7 +206,7 @@ window.updateTopicList = function() {
         .map(p => String(p.chuDe).trim());
 
     const topics = [...new Set(AppState.allQuizData
-        .filter(i => i.mon.toLowerCase() === monSelect)
+        .filter(i => i.mon.toLowerCase() === monSelect && i.question !== '')
         .map(i => i.chuDe))].filter(topic => topic !== "");
 
     if (topics.length === 0) {
@@ -227,8 +226,6 @@ window.loadData = function() {
     const maHS = document.getElementById('student-code').value.trim();
     if (!maHS) return alert("Vui lòng nhập mã học sinh!");
     localStorage.setItem('saved_maHS', maHS);
-
-    // Xóa cache cũ để bắt buộc tải dữ liệu mới nhất từ Google Sheets
     localStorage.removeItem('cache_quiz_data_' + maHS);
 
     const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
@@ -241,7 +238,11 @@ window.loadData = function() {
 
 window.handleQuizData = function(data) {
     if (data.error) return;
-    AppState.allQuizData = (data.questions || []).map(normalizeItem);
+    // LỌC BỎ CÁC DÒNG TRỐNG KHÔNG CÓ NỘI DUNG CÂU HỎI Ở ĐÂY
+    AppState.allQuizData = (data.questions || [])
+        .map(normalizeItem)
+        .filter(item => item.question !== '' && item.mon !== '');
+        
     AppState.userPermissions = data.permissions || [];
     AppState.rankings = data.rankings || [];
 
@@ -301,7 +302,7 @@ window.startQuiz = function() {
     let readingQuestions = AppState.allQuizData.filter(i => {
         const isSameSubject = (i.mon.toLowerCase() === mon.trim().toLowerCase());
         const isTopicMatch = readingTopics.includes(i.chuDe);
-        return isSameSubject && isTopicMatch;
+        return isSameSubject && isTopicMatch && i.question !== '';
     });
 
     let normalQuestions = [];
@@ -310,7 +311,7 @@ window.startQuiz = function() {
             const isSameSubject = (i.mon.toLowerCase() === mon.trim().toLowerCase());
             const isTopicMatch = normalTopics.includes(i.chuDe);
             const isLevelMatch = (mon !== 'Tiếng Anh') || (i.level === String(levelSelected).trim());
-            return isSameSubject && isTopicMatch && isLevelMatch;
+            return isSameSubject && isTopicMatch && isLevelMatch && i.question !== '';
         });
         normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
     }
