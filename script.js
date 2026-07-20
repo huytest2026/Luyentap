@@ -305,8 +305,19 @@ window.handleQuizData = function(data) {
             if (item.loai) lastLoai = item.loai;
             else if (lastLoai) item.loai = lastLoai;
 
-            if (item.passage) lastPassage = item.passage;
-            else if (lastPassage) item.passage = lastPassage;
+            // QUAN TRỌNG: Chỉ lưu và nhớ passage nếu thực sự thuộc môn Tiếng Anh và đúng dòng đọc hiểu
+            if (item.passage) {
+                lastPassage = item.passage;
+            } else if (cleanKey(item.mon) !== cleanKey('Tiếng Anh') || !String(item.chuDe || '').toUpperCase().startsWith('DH')) {
+                lastPassage = ''; // Xóa sạch passage nếu chuyển sang môn khác hoặc chủ đề khác không phải đọc hiểu
+            } else if (lastPassage) {
+                item.passage = lastPassage;
+            }
+
+            // Chặn tuyệt đối passage lọt sang môn Toán
+            if (cleanKey(item.mon) !== cleanKey('Tiếng Anh')) {
+                item.passage = '';
+            }
 
             return item;
         })
@@ -442,7 +453,8 @@ window.renderQuiz = function() {
     if (!container) return;
 
     let passageHtml = '';
-    let passageItems = AppState.currentQuizData.filter(i => i.passage && i.passage.trim() !== '');
+    // Lọc chỉ lấy passage thực sự có nội dung và bắt buộc phải là môn Tiếng Anh
+    let passageItems = AppState.currentQuizData.filter(i => cleanKey(i.mon) === cleanKey('Tiếng Anh') && i.passage && i.passage.trim() !== '');
     if (passageItems.length > 0) {
         let uniquePassages = {};
         passageItems.forEach(item => {
