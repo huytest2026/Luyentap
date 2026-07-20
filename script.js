@@ -6,7 +6,8 @@ const AppState = {
     timerInterval: null,
     correctCount: 0,
     wrongCount: 0,
-    wrongQuestions: []
+    wrongQuestions: [],
+    isReadingComp: false
 };
 
 (function injectStyles() {
@@ -25,6 +26,30 @@ const AppState = {
         .speaker-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; }
         #retry-wrong-btn { background: #d9534f; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-top: 10px; width: 100%; font-weight: bold; }
         
+        .passage-box { 
+            background: #ffffff; 
+            border: 2px solid #540606; 
+            border-radius: 12px; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            font-size: 1.05em; 
+            line-height: 1.6; 
+            color: #333; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+        }
+
+        .passage-tag {
+            display: inline-block;
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            padding: 5px 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            color: #333;
+            font-size: 1em;
+        }
+
         input[type="text"], select {
             width: 100%;
             padding: 12px 15px;
@@ -82,7 +107,8 @@ function normalizeItem(item) {
         correct: String(getVal(['correct', 'dapan_dung', 'dap an dung', 'đáp án đúng', 'dapandung', 'đáp_án_đúng'])).trim(),
         explanation: String(getVal(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai'])).trim(),
         loai: String(getVal(['loai', 'loại'])).trim(),
-        level: String(getVal(['level', 'cấp độ', 'cap do'])).trim()
+        level: String(getVal(['level', 'cấp độ', 'cap do'])).trim(),
+        passage: String(getVal(['passage', 'doanvan', 'đoạn văn'])).trim()
     };
 }
 
@@ -258,7 +284,8 @@ window.startQuiz = function() {
     const selected = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
     if (!selected.length) return alert("Vui lòng chọn chủ đề!");
     
-    let limit = (mon === 'Toán') ? 10 : 20;
+    let isReadingComp = selected.some(t => t.toUpperCase().startsWith('DH')) || 
+                        AppState.allQuizData.some(i => selected.includes(i.chuDe) && i.passage !== '');
     
     let filtered = AppState.allQuizData.filter(i => {
         const isSameSubject = (i.mon.toLowerCase() === mon.trim().toLowerCase());
@@ -269,7 +296,13 @@ window.startQuiz = function() {
 
     if (filtered.length === 0) return alert("Không tìm thấy câu hỏi phù hợp cho lựa chọn này!");
 
-    let rawSelectedQuestions = filtered.sort(() => 0.5 - Math.random()).slice(0, limit);
+    let rawSelectedQuestions = [];
+    if (isReadingComp) {
+        rawSelectedQuestions = filtered;
+    } else {
+        let limit = (mon === 'Toán') ? 10 : 20;
+        rawSelectedQuestions = filtered.sort(() => 0.5 - Math.random()).slice(0, limit);
+    }
     
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
@@ -282,6 +315,7 @@ window.startQuiz = function() {
         };
     });
 
+    AppState.isReadingComp = isReadingComp;
     AppState.correctCount = 0; 
     AppState.wrongCount = 0;
     AppState.wrongQuestions = [];
@@ -290,14 +324,31 @@ window.startQuiz = function() {
     document.getElementById('quiz-screen').style.display = 'block';
     window.renderQuiz();
     
-    let totalSeconds = (mon === 'Toán') ? 15 * 60 : 10 * 60;
+    let totalSeconds = 10 * 60;
+    if (isReadingComp) {
+        totalSeconds = 12 * 60;
+    } else if (mon === 'Toán') {
+        totalSeconds = 15 * 60;
+    }
     window.startTimerTotal(totalSeconds);
 };
 
 window.renderQuiz = function() {
     const container = document.getElementById('quiz');
     if (!container) return;
-    container.innerHTML = AppState.currentQuizData.map((item, index) => {
+
+    let passageHtml = '';
+    if (AppState.isReadingComp && AppState.currentQuizData.length > 0 && AppState.currentQuizData[0].passage) {
+        let passageCode = AppState.currentQuizData[0].chuDe;
+        passageHtml = `
+            <div class="passage-box">
+                <div class="passage-tag">${escapeHTML(passageCode)}</div>
+                <div style="white-space: pre-line;">${escapeHTML(AppState.currentQuizData[0].passage)}</div>
+            </div>
+        `;
+    }
+
+    let questionsHtml = AppState.currentQuizData.map((item, index) => {
         let loaiVal = item.loai.toLowerCase();
         let hasNoOptions = (!item.a || item.a.trim() === '') &&
                            (!item.b || item.b.trim() === '') &&
@@ -308,16 +359,14 @@ window.renderQuiz = function() {
         let questionText = item.question;
         let explanationText = item.explanation || 'Không có giải thích.';
 
-        // Xử lý nút đọc (speaker) tự động thông minh hơn
         let speakerBtn = '';
-        if (item.mon.toLowerCase() === 'tiếng anh') {
+        if (item.mon.toLowerCase() === 'tiếng anh' && !AppState.isReadingComp) {
             let chuDeLower = String(item.chuDe || '').toLowerCase();
             let loaiLower = String(item.loai || '').toLowerCase();
             let speakTextContent = questionText;
             let speakerLabel = '🔊 Nghe câu hỏi';
 
             if (isVoca) {
-                // Tự động nhận diện Việt - Anh nếu tên chủ đề, loại có chữ việt anh HOẶC câu hỏi chứa ký tự tiếng Việt (như "Ấm áp")
                 const hasVietnameseChars = /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i.test(questionText);
                 const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh') || 
                                   loaiLower.includes('việt anh') || loaiLower.includes('viet anh') || 
@@ -361,6 +410,8 @@ window.renderQuiz = function() {
             <div class="explanation-box" id="exp-${index}"><b>Giải thích:</b> ${escapeHTML(explanationText)}</div>
         </div>`;
     }).join('');
+
+    container.innerHTML = passageHtml + questionsHtml;
 };
 
 window.handleSpeak = function(btn) {
