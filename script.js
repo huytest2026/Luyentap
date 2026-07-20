@@ -168,7 +168,6 @@ window.startQuiz = function() {
     document.getElementById('quiz-screen').style.display = 'block';
     window.renderQuiz();
     
-    // Cài đặt tổng thời gian chuẩn xác: Toán 15 phút (900 giây), Tiếng Anh 10 phút (600 giây)
     let totalSeconds = (mon === 'Toán') ? 15 * 60 : 10 * 60;
     window.startTimerTotal(totalSeconds);
 };
@@ -201,12 +200,13 @@ window.checkAnswer = function(element, chosen, index) {
     card.setAttribute('data-answered', 'true');
 
     const item = AppState.currentQuizData[index];
-    const correctOpt = String(item.correct).trim().toUpperCase();
+    const correctOpt = String(item.correct || '').trim().toUpperCase();
     
     const options = card.querySelectorAll('.option-box');
     options.forEach(opt => {
         opt.style.pointerEvents = 'none';
-        if (opt.textContent.trim().startsWith(correctOpt + '.')) {
+        const optLetter = opt.querySelector('b').textContent.replace('.', '').trim().toUpperCase();
+        if (optLetter === correctOpt) {
             opt.style.backgroundColor = '#d4edda';
             opt.style.borderColor = '#28a745';
         }
