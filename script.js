@@ -106,18 +106,31 @@ function normalizeItem(item) {
         return '';
     };
 
+    // Tìm câu hỏi với danh sách từ khóa cực kỳ rộng (bao gồm cả noi_dung, de_bai, nd,...)
+    let questionVal = getVal(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi_dung', 'noidung', 'cauhoi', 'cau_hoi', 'cau', 'de_bai', 'de', 'nd', 'content', 'text', 'câu hỏi', 'nội dung câu hỏi', 'đề bài', 'đề']);
+    if (!questionVal) {
+        // Fallback tự động dò cột nếu tên cột không khớp bất kỳ từ khóa nào phía trên
+        const excluded = ['mon', 'chude', 'a', 'b', 'c', 'd', 'correct', 'explanation', 'loai', 'level', 'passage', 'stt', 'id', 'ghichu', 'note'];
+        for (let realKey of Object.keys(item)) {
+            if (!excluded.includes(cleanKey(realKey)) && item[realKey] && String(item[realKey]).trim() !== '') {
+                questionVal = String(item[realKey]).trim();
+                break;
+            }
+        }
+    }
+
     return {
-        mon: String(getVal(['mon', 'môn'])).trim(),
-        chuDe: String(getVal(['chude', 'chủ đề', 'chu de'])).trim(),
-        question: String(getVal(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi dung cau hỏi', 'cau hỏi', 'câu hỏi'])).trim(),
-        a: String(getVal(['a', 'dapan_a', 'dap an a', 'đáp án a'])).trim(),
-        b: String(getVal(['b', 'dapan_b', 'dap an b', 'đáp án b'])).trim(),
-        c: String(getVal(['c', 'dapan_c', 'dap an c', 'đáp án c'])).trim(),
-        d: String(getVal(['d', 'dapan_d', 'dap an d', 'đáp án d'])).trim(),
-        correct: String(getVal(['correct', 'dapan_dung', 'dap an dung', 'đáp án đúng', 'dapandung', 'đáp_án_đúng'])).trim(),
-        explanation: String(getVal(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai', 'giải thích'])).trim(),
-        loai: String(getVal(['loai', 'loại'])).trim(),
-        level: String(getVal(['level', 'cấp độ', 'cap do'])).trim(),
+        mon: String(getVal(['mon', 'môn', 'subject'])).trim(),
+        chuDe: String(getVal(['chude', 'chủ đề', 'chu de', 'topic'])).trim(),
+        question: String(questionVal).trim(),
+        a: String(getVal(['a', 'dapan_a', 'dap an a', 'đáp án a', 'option_a'])).trim(),
+        b: String(getVal(['b', 'dapan_b', 'dap an b', 'đáp án b', 'option_b'])).trim(),
+        c: String(getVal(['c', 'dapan_c', 'dap an c', 'đáp án c', 'option_c'])).trim(),
+        d: String(getVal(['d', 'dapan_d', 'dap an d', 'đáp án d', 'option_d'])).trim(),
+        correct: String(getVal(['correct', 'dapan_dung', 'dap an dung', 'đáp án đúng', 'dapandung', 'đáp_án_đúng', 'answer'])).trim(),
+        explanation: String(getVal(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai', 'giải thích', 'giai thich'])).trim(),
+        loai: String(getVal(['loai', 'loại', 'type'])).trim(),
+        level: String(getVal(['level', 'cấp độ', 'cap do', 'muc do'])).trim(),
         passage: String(getVal(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content'])).trim()
     };
 }
