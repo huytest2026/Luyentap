@@ -87,12 +87,21 @@ function escapeHTML(str) {
     });
 }
 
+function removeDiacritics(str) {
+    return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+}
+
+function cleanKey(str) {
+    return removeDiacritics(str).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 function normalizeItem(item) {
     const getVal = (keys) => {
         for (let k of keys) {
             if (item[k] !== undefined && item[k] !== null && String(item[k]).trim() !== '') return item[k];
-            const foundKey = Object.keys(item).find(realKey => realKey.toLowerCase().replace(/[^a-z0-9]/g, '') === k.toLowerCase().replace(/[^a-z0-9]/g, ''));
-            if (foundKey && item[foundKey] !== undefined && item[foundKey] !== null) return item[foundKey];
+            const cleanK = cleanKey(k);
+            const foundKey = Object.keys(item).find(realKey => cleanKey(realKey) === cleanK);
+            if (foundKey && item[foundKey] !== undefined && item[foundKey] !== null && String(item[foundKey]).trim() !== '') return item[foundKey];
         }
         return '';
     };
@@ -100,13 +109,13 @@ function normalizeItem(item) {
     return {
         mon: String(getVal(['mon', 'môn'])).trim(),
         chuDe: String(getVal(['chude', 'chủ đề', 'chu de'])).trim(),
-        question: String(getVal(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi dung cau hỏi'])).trim(),
+        question: String(getVal(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi dung cau hỏi', 'cau hỏi', 'câu hỏi'])).trim(),
         a: String(getVal(['a', 'dapan_a', 'dap an a', 'đáp án a'])).trim(),
         b: String(getVal(['b', 'dapan_b', 'dap an b', 'đáp án b'])).trim(),
         c: String(getVal(['c', 'dapan_c', 'dap an c', 'đáp án c'])).trim(),
         d: String(getVal(['d', 'dapan_d', 'dap an d', 'đáp án d'])).trim(),
         correct: String(getVal(['correct', 'dapan_dung', 'dap an dung', 'đáp án đúng', 'dapandung', 'đáp_án_đúng'])).trim(),
-        explanation: String(getVal(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai'])).trim(),
+        explanation: String(getVal(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai', 'giải thích'])).trim(),
         loai: String(getVal(['loai', 'loại'])).trim(),
         level: String(getVal(['level', 'cấp độ', 'cap do'])).trim(),
         passage: String(getVal(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'noidung', 'reading', 'content'])).trim()
