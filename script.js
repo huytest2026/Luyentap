@@ -95,7 +95,6 @@ function cleanKey(str) {
     return removeDiacritics(str).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-// Hàm chuẩn hóa dữ liệu hoàn hảo, hỗ trợ cả tên cột và vị trí cột chuẩn trên Sheets
 function normalizeItem(item) {
     if (!item) return null;
     
@@ -121,11 +120,6 @@ function normalizeItem(item) {
         return '';
     };
 
-    // Theo đúng cấu trúc Sheets của bạn:
-    // Cột A (0): ID, Cột B (1): Môn, Cột C (2): Chủ đề, Cột D (3): Nội dung câu hỏi
-    // Cột E (4): Đáp án A, Cột F (5): Đáp án B, Cột G (6): Đáp án C, Cột H (7): Đáp án D
-    // Cột I (8): Đáp án đúng, Cột J (9): Diễn giải, Cột K (10): loai, Cột L (11): Level, Cột M (12): passage
-    
     const mon = getVal(['mon', 'môn', 'subject'], 1);
     const chuDe = getVal(['chude', 'chủ đề', 'chu de', 'topic'], 2);
     let question = getVal(['question', 'noidungcauhoi', 'noi_dung_cau_hoi', 'noi_dung', 'noidung', 'cauhoi', 'cau_hoi', 'cau', 'de_bai', 'de', 'nd', 'content', 'text', 'câu hỏi', 'nội dung câu hỏi', 'đề bài', 'đề'], 3);
@@ -235,10 +229,12 @@ window.updateTopicList = function() {
         return;
     }
 
+    const hasSpecificPermissions = allowed.length > 0;
+
     container.innerHTML = topics.map(topic => {
-        const isAllowed = allowed.includes(topic);
+        const isAllowed = !hasSpecificPermissions || allowed.includes(topic);
         return `<label style="display:block; margin:5px 0; opacity:${isAllowed ? '1' : '0.5'}">
-            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : 'disabled'}> ${escapeHTML(topic)}
+            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : ''}> ${escapeHTML(topic)}
         </label>`;
     }).join('');
 };
@@ -263,7 +259,23 @@ window.handleQuizData = function(data) {
         .map(normalizeItem)
         .filter(item => item && item.question !== '' && item.mon !== '');
         
-    AppState.userPermissions = data.permissions || [];
+    // Xử lý fill-down cho bảng phân quyền
+    let lastMaHS = '';
+    let lastMon = '';
+    AppState.userPermissions = (data.permissions || []).map(p => {
+        let maHS = String(p.maHS || p[0] || '').trim();
+        let mon = String(p.mon || p[1] || '').trim();
+        let chuDe = String(p.chuDe || p[2] || '').trim();
+        
+        if (maHS !== '') lastMaHS = maHS;
+        else maHS = lastMaHS;
+        
+        if (mon !== '') lastMon = mon;
+        else mon = lastMon;
+        
+        return { maHS, mon, chuDe };
+    }).filter(p => p.chuDe !== '');
+
     AppState.rankings = data.rankings || [];
 
     const maHS = document.getElementById('student-code').value.trim();
