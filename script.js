@@ -71,7 +71,6 @@ window.handleSubjectChange = function() {
     window.renderLeaderboard(mon);
 };
 
-// Logic phân cấp mở khóa Level 1 -> Level 2 -> Level 3 (điểm >= 8)
 window.updateLevelOptions = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelect = document.getElementById('level-select');
@@ -124,7 +123,6 @@ window.updateTopicList = function() {
         .filter(p => String(p.maHS).trim() === maHS && String(p.mon).trim().toLowerCase() === monSelect)
         .map(p => String(p.chuDe).trim());
 
-    // Lọc bỏ triệt để các chuỗi trống hoặc khoảng trắng thừa
     const topics = [...new Set(AppState.allQuizData
         .filter(i => String(i.mon).trim().toLowerCase() === monSelect)
         .map(i => String(i.chuDe).trim()))].filter(topic => topic !== "");
@@ -376,7 +374,9 @@ window.startTimerTotal = function(totalSeconds) {
 window.speakText = function(text) {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        let utterance = new SpeechSynthesisUtterance(text);
+        // Thay thế các dấu gạch dưới (_) bằng từ "blank" để tạo khoảng nghỉ/ngữ cảnh tự nhiên
+        let processedText = text.replace(/[_]+/g, ' blank ');
+        let utterance = new SpeechSynthesisUtterance(processedText);
         utterance.lang = 'en-US';
         window.speechSynthesis.speak(utterance);
     } else {
