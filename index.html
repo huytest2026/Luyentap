@@ -21,6 +21,7 @@
             border-bottom: 2px solid #540606;
             display: flex;
             justify-content: space-between;
+            align-items: center;
             font-weight: bold;
             z-index: 100;
             border-top-left-radius: 8px;
@@ -78,7 +79,10 @@
 <div class="container" id="quiz-screen" style="display:none;">
     <!-- Thanh trạng thái cố định khi cuộn -->
     <div class="quiz-sticky-header">
-        <div>⏱️ Thời gian: <span id="timer-display" style="color: red;">--:--</span></div>
+        <div>⏱️ <span id="timer-display" style="color: red;">--:--</span></div>
+        <div>
+            <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: bold;">🏠 Trang chủ</button>
+        </div>
         <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
     </div>
     
@@ -86,6 +90,19 @@
     <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 8px;">Nộp bài</button>
 </div>
 
+<script>
+    window.backToHome = function() {
+        if (confirm("Bạn có chắc muốn thoát ra màn hình chính? Bài làm hiện tại sẽ không được lưu.")) {
+            if (typeof AppState !== 'undefined' && AppState.timerInterval) {
+                clearInterval(AppState.timerInterval);
+            }
+            document.getElementById('quiz-screen').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'block';
+            const resContainer = document.getElementById('result-container');
+            if (resContainer) resContainer.remove();
+        }
+    };
+</script>
 <script src="script.js"></script>
 </body>
 </html>
