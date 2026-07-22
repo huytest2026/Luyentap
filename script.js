@@ -393,7 +393,7 @@ window.loadData = function() {
     const container = document.getElementById('topic-container');
     if (container) container.innerHTML = "Đang tải dữ liệu chủ đề...";
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
     script.onerror = () => { 
@@ -612,7 +612,6 @@ window.startQuiz = function() {
     document.getElementById('start-screen').style.display = 'none';
     document.getElementById('quiz-screen').style.display = 'block';
     
-    // Xóa container kết quả cũ nếu có
     const oldResult = document.getElementById('result-container');
     if (oldResult) oldResult.remove();
 
@@ -737,6 +736,13 @@ window.handleSpeak = function(btn) {
     window.speakText(text);
 };
 
+function updateScoreDisplay() {
+    const correctEls = document.querySelectorAll('#correct-count-display');
+    const wrongEls = document.querySelectorAll('#wrong-count-display');
+    correctEls.forEach(el => el.textContent = AppState.correctCount);
+    wrongEls.forEach(el => el.textContent = AppState.wrongCount);
+}
+
 window.checkAnswer = function(element, chosenKey, index) {
     const card = document.getElementById(`q-card-${index}`);
     if (card.getAttribute('data-answered') === 'true') return;
@@ -745,7 +751,6 @@ window.checkAnswer = function(element, chosenKey, index) {
     const item = AppState.currentQuizData[index];
     const correctKey = item._correctKey;
     
-    // Lưu lại lựa chọn của người dùng để phục vụ chức năng xem chi tiết
     item._userChoiceKey = chosenKey;
 
     const options = card.querySelectorAll('.option-box');
@@ -769,6 +774,8 @@ window.checkAnswer = function(element, chosenKey, index) {
         element.style.backgroundColor = '#f8d7da';
         element.style.borderColor = '#842029';
     }
+
+    updateScoreDisplay();
 
     const expBox = document.getElementById(`exp-${index}`);
     if (expBox) expBox.style.display = 'block';
@@ -804,6 +811,8 @@ window.checkVocaAnswer = function(index) {
         input.style.borderColor = '#842029';
     }
 
+    updateScoreDisplay();
+
     const expBox = document.getElementById(`exp-${index}`);
     if (expBox) expBox.style.display = 'block';
     checkQuizFinished();
@@ -822,24 +831,16 @@ function checkQuizFinished() {
 window.startTimerTotal = function(seconds) {
     if (AppState.timerInterval) clearInterval(AppState.timerInterval);
     let timeLeft = seconds;
-    
-    let timerDisplay = document.getElementById('timer-display');
-    if (!timerDisplay) {
-        const quizScreen = document.getElementById('quiz-screen');
-        if (quizScreen) {
-            const topBar = document.createElement('div');
-            topBar.innerHTML = `Thời gian còn lại: <span id="timer-display" style="color: red; font-weight: bold;">--:--</span>`;
-            quizScreen.insertBefore(topBar, quizScreen.firstChild);
-            timerDisplay = document.getElementById('timer-display');
-        }
-    }
+
+    updateScoreDisplay();
 
     AppState.timerInterval = setInterval(() => {
         let m = Math.floor(timeLeft / 60);
         let s = timeLeft % 60;
-        if (timerDisplay) {
-            timerDisplay.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        }
+        const timerDisplays = document.querySelectorAll('#timer-display');
+        timerDisplays.forEach(el => {
+            el.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        });
         if (timeLeft <= 0) {
             clearInterval(AppState.timerInterval);
             alert("Hết giờ làm bài!");
@@ -854,7 +855,6 @@ window.submitQuiz = function() {
 
     const totalQ = AppState.currentQuizData.length;
     
-    // Tự động thêm các câu chưa trả lời vào danh sách câu sai
     AppState.currentQuizData.forEach((item, index) => {
         const card = document.getElementById(`q-card-${index}`);
         if (card && card.getAttribute('data-answered') !== 'true') {
@@ -899,7 +899,7 @@ window.submitQuiz = function() {
     }
 
     resultContainer.innerHTML = `
-        <h2 style="text-align: center; color: #007bff;">🎉 Kết Quả Bài Làm</h2>
+        <h2 style="text-align: center; color: #007bff;">🎉 Tổng Kết Bài Làm</h2>
         <p>Học sinh: <b>${escapeHTML(maHS)}</b></p>
         <p>Môn: <b>${escapeHTML(mon)}</b></p>
         <p>Số câu đúng: <span style="color: green; font-weight: bold;">${AppState.correctCount}</span> / ${totalQ}</p>
@@ -917,7 +917,6 @@ window.submitQuiz = function() {
     window.renderLeaderboard(mon);
 };
 
-// Khôi phục tính năng Xem lại chi tiết bài làm
 window.viewDetailedReview = function() {
     const container = document.getElementById('detailed-review-container');
     if (!container) return;
@@ -955,7 +954,6 @@ window.viewDetailedReview = function() {
     container.innerHTML = reviewHtml;
 };
 
-// Khôi phục tính năng Làm lại câu sai
 window.retryWrongQuestions = function() {
     if (!AppState.wrongQuestions || AppState.wrongQuestions.length === 0) return;
     AppState.currentQuizData = [...AppState.wrongQuestions];
@@ -984,4 +982,3 @@ window.speakText = function(text) {
     utterance.lang = 'en-US';
     window.speechSynthesis.speak(utterance);
 };
-
