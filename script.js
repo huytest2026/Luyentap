@@ -305,16 +305,14 @@ window.handleQuizData = function(data) {
             if (item.loai) lastLoai = item.loai;
             else if (lastLoai) item.loai = lastLoai;
 
-            // QUAN TRỌNG: Chỉ lưu và nhớ passage nếu thực sự thuộc môn Tiếng Anh và đúng dòng đọc hiểu
             if (item.passage) {
                 lastPassage = item.passage;
             } else if (cleanKey(item.mon) !== cleanKey('Tiếng Anh') || !String(item.chuDe || '').toUpperCase().startsWith('DH')) {
-                lastPassage = ''; // Xóa sạch passage nếu chuyển sang môn khác hoặc chủ đề khác không phải đọc hiểu
+                lastPassage = ''; 
             } else if (lastPassage) {
                 item.passage = lastPassage;
             }
 
-            // Chặn tuyệt đối passage lọt sang môn Toán
             if (cleanKey(item.mon) !== cleanKey('Tiếng Anh')) {
                 item.passage = '';
             }
@@ -343,6 +341,19 @@ window.handleQuizData = function(data) {
 
     const maHS = document.getElementById('student-code').value.trim();
     localStorage.setItem('cache_quiz_data_' + maHS, JSON.stringify(data));
+
+    // --- TỰ ĐỘNG CẬP NHẬT DANH SÁCH MÔN VÀO THẺ SELECT ---
+    const subjectSelect = document.getElementById('subject-select');
+    if (subjectSelect) {
+        const currentVal = subjectSelect.value;
+        const subjects = [...new Set(AppState.allQuizData.map(i => i.mon).filter(Boolean))];
+        subjectSelect.innerHTML = `<option value="">-- Chọn môn --</option>` + 
+            subjects.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
+        if (subjects.includes(currentVal)) {
+            subjectSelect.value = currentVal;
+        }
+    }
+    // ----------------------------------------------------
 
     window.renderLeaderboard();
     window.updateTopicList();
@@ -453,7 +464,6 @@ window.renderQuiz = function() {
     if (!container) return;
 
     let passageHtml = '';
-    // Lọc chỉ lấy passage thực sự có nội dung và bắt buộc phải là môn Tiếng Anh
     let passageItems = AppState.currentQuizData.filter(i => cleanKey(i.mon) === cleanKey('Tiếng Anh') && i.passage && i.passage.trim() !== '');
     if (passageItems.length > 0) {
         let uniquePassages = {};
