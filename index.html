@@ -10,6 +10,23 @@
         .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
         .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0; cursor: pointer; }
         #topic-container { margin: 10px 0; padding: 10px; border: 1px solid #ddd; max-height: 150px; overflow-y: auto; background: #fff; }
+        
+        /* Thanh trạng thái cố định khi cuộn */
+        .quiz-sticky-header {
+            position: sticky;
+            top: 0;
+            background-color: #bbe9f0;
+            padding: 12px 15px;
+            margin: -20px -20px 15px -20px;
+            border-bottom: 2px solid #540606;
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            z-index: 100;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
     </style>
 </head>
 <body>
@@ -59,12 +76,14 @@
 </div>
 
 <div class="container" id="quiz-screen" style="display:none;">
-    <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
-        <div>Thời gian: <span id="timer-display" style="color: red;">--:--</span></div>
+    <!-- Thanh trạng thái cố định khi cuộn -->
+    <div class="quiz-sticky-header">
+        <div>⏱️ Thời gian: <span id="timer-display" style="color: red;">--:--</span></div>
         <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
     </div>
-    <div id="quiz"></div>
-    <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer;">Nộp bài</button>
+    
+    <div id="quiz" style="margin-top: 15px;"></div>
+    <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 8px;">Nộp bài</button>
 </div>
 
 <script src="script.js"></script>
