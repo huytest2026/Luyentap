@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã tự động dọn dẹp các phần thừa cũ)
+// FILE: script.js (Đã thêm tổng số câu)
 // ==========================================
 
 const AppState = {
@@ -424,6 +424,7 @@ window.startQuiz = function() {
 
     AppState.correctCount = 0;
     AppState.wrongCount = 0;
+    let totalQuestions = AppState.currentQuizData.length;
 
     const startScreen = document.getElementById('start-screen');
     if (startScreen) startScreen.style.display = 'none';
@@ -454,7 +455,8 @@ window.startQuiz = function() {
             </div>
             <div class="score-display-box">
                 Đúng: <span id="custom-correct-count" style="color: #28a745; font-weight: bold;">0</span> | 
-                Sai: <span id="custom-wrong-count" style="color: #dc3545; font-weight: bold;">0</span>
+                Sai: <span id="custom-wrong-count" style="color: #dc3545; font-weight: bold;">0</span> | 
+                Tổng số câu: <span style="color: #4f46e5; font-weight: bold;">${totalQuestions}</span>
             </div>
         `;
     }
