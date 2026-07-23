@@ -53,12 +53,12 @@
         </select>
     </div>
 
+    <!-- KHUNG CHỌN MÃ ĐỀ (MADE) -->
     <div id="made-container" style="display: none;">
-        <label style="display:block; margin-top:10px;">Chọn Mã đề (MADE):</label>
+        <label style="display:block; margin-top:10px; font-weight: bold; color: #540606;">Chọn Mã đề (MADE):</label>
         <select id="made-select" onchange="window.handleMadeChange()" style="width: 100%; padding: 10px; margin: 10px 0;">
             <option value="">-- Tất cả mã đề / Mặc định --</option>
         </select>
-        <!-- Khu vực hiển thị passage khi chọn MADE -->
         <div id="made-passage-preview"></div>
     </div>
 
@@ -77,7 +77,6 @@
 </div>
 
 <div class="container" id="quiz-screen" style="display:none;">
-    <!-- Thanh trạng thái cố định khi cuộn -->
     <div class="quiz-sticky-header">
         <div>⏱️ <span id="timer-display" style="color: red;">--:--</span></div>
         <div>
@@ -90,19 +89,6 @@
     <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 15px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 8px;">Nộp bài</button>
 </div>
 
-<script>
-    window.backToHome = function() {
-        if (confirm("Bạn có chắc muốn thoát ra màn hình chính? Bài làm hiện tại sẽ không được lưu.")) {
-            if (typeof AppState !== 'undefined' && AppState.timerInterval) {
-                clearInterval(AppState.timerInterval);
-            }
-            document.getElementById('quiz-screen').style.display = 'none';
-            document.getElementById('start-screen').style.display = 'block';
-            const resContainer = document.getElementById('result-container');
-            if (resContainer) resContainer.remove();
-        }
-    };
-</script>
 <script src="script.js"></script>
 </body>
 </html>
