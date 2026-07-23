@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã hoàn thiện cập nhật toàn diện)
+// FILE: script.js (Đã cập nhật sửa lỗi Mã đề & Nút nộp bài)
 // ==========================================
 
 const AppState = {
@@ -581,42 +581,66 @@ window.startQuiz = function() {
     const mon = document.getElementById('subject-select').value;
     const levelSelected = document.getElementById('level-select') ? document.getElementById('level-select').value : '';
     const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
-    const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
-    if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
     
-    let readingTopics = selectedTopics.filter(t => {
-        let u = t.toUpperCase();
-        return u.startsWith('DH') || u.startsWith('TV');
-    });
-    let normalTopics = selectedTopics.filter(t => {
-        let u = t.toUpperCase();
-        return !u.startsWith('DH') && !u.startsWith('TV');
-    });
+    let rawSelectedQuestions = [];
+    let isReadingComp = false;
+    let totalSeconds = 10 * 60;
 
-    let readingQuestions = AppState.allQuizData.filter(i => {
-        const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
-        const isTopicMatch = readingTopics.includes(i.chuDe);
-        const isMadeMatch = !selectedMade || (String(i.made).trim() === selectedMade);
-        return isSameSubject && isTopicMatch && isMadeMatch && i.question !== '';
-    });
-
-    let normalQuestions = [];
-    if (normalTopics.length > 0) {
-        let filteredNormal = AppState.allQuizData.filter(i => {
+    if (selectedMade) {
+        // Khi chọn Mã đề: Lấy TẤT CẢ câu hỏi thuộc mã đề đó (bao nhiêu chọn bấy nhiêu), thời gian cố định 45 phút
+        rawSelectedQuestions = AppState.allQuizData.filter(i => {
             const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
-            const isTopicMatch = normalTopics.includes(i.chuDe);
-            const isLevelMatch = (cleanKey(mon) !== cleanKey('Tiếng Anh')) || (String(i.level).trim() === String(levelSelected).trim());
-            const isMadeMatch = !selectedMade || (String(i.made).trim() === selectedMade);
-            return isSameSubject && isTopicMatch && isLevelMatch && isMadeMatch && i.question !== '';
+            const isMadeMatch = (String(i.made).trim() === selectedMade);
+            return isSameSubject && isMadeMatch && i.question !== '';
         });
-        normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
+        totalSeconds = 45 * 60; // 45 phút cho Mã đề
+        isReadingComp = rawSelectedQuestions.some(i => {
+            let u = String(i.chuDe || '').toUpperCase();
+            return u.startsWith('DH') || u.startsWith('TV');
+        });
+    } else {
+        // Khi không chọn Mã đề: chọn theo chủ đề, giới hạn 20 câu đối với phần thường
+        const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+        if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
+        
+        let readingTopics = selectedTopics.filter(t => {
+            let u = t.toUpperCase();
+            return u.startsWith('DH') || u.startsWith('TV');
+        });
+        let normalTopics = selectedTopics.filter(t => {
+            let u = t.toUpperCase();
+            return !u.startsWith('DH') && !u.startsWith('TV');
+        });
+
+        let readingQuestions = AppState.allQuizData.filter(i => {
+            const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
+            const isTopicMatch = readingTopics.includes(i.chuDe);
+            return isSameSubject && isTopicMatch && i.question !== '';
+        });
+
+        let normalQuestions = [];
+        if (normalTopics.length > 0) {
+            let filteredNormal = AppState.allQuizData.filter(i => {
+                const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
+                const isTopicMatch = normalTopics.includes(i.chuDe);
+                const isLevelMatch = (cleanKey(mon) !== cleanKey('Tiếng Anh')) || (String(i.level).trim() === String(levelSelected).trim());
+                return isSameSubject && isTopicMatch && isLevelMatch && i.question !== '';
+            });
+            normalQuestions = filteredNormal.sort(() => 0.5 - Math.random()).slice(0, 20);
+        }
+
+        rawSelectedQuestions = [...readingQuestions, ...normalQuestions];
+        isReadingComp = readingTopics.length > 0;
+        
+        if (isReadingComp) {
+            totalSeconds = 22 * 60; 
+        } else if (cleanKey(mon) === cleanKey('Toán')) {
+            totalSeconds = 15 * 60;
+        }
     }
 
-    let rawSelectedQuestions = [...readingQuestions, ...normalQuestions];
     if (rawSelectedQuestions.length === 0) return alert("Không tìm thấy câu hỏi phù hợp cho lựa chọn này!");
 
-    let isReadingComp = readingTopics.length > 0;
-    
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
@@ -637,19 +661,23 @@ window.startQuiz = function() {
     AppState.wrongQuestions = [];
     
     document.getElementById('start-screen').style.display = 'none';
-    document.getElementById('quiz-screen').style.display = 'block';
+    
+    // Dọn dẹp các nút nộp bài thừa hoặc tĩnh bên ngoài trước khi hiển thị màn hình quiz
+    const quizScreen = document.getElementById('quiz-screen');
+    if (quizScreen) {
+        quizScreen.style.display = 'block';
+        const extraBtns = quizScreen.querySelectorAll('button');
+        extraBtns.forEach(b => {
+            if (b.textContent.includes('Nộp bài')) {
+                b.remove();
+            }
+        });
+    }
     
     const oldResult = document.getElementById('result-container');
     if (oldResult) oldResult.remove();
 
     window.renderQuiz();
-    
-    let totalSeconds = 10 * 60;
-    if (isReadingComp) {
-        totalSeconds = 22 * 60; 
-    } else if (cleanKey(mon) === cleanKey('Toán')) {
-        totalSeconds = 15 * 60;
-    }
     window.startTimerTotal(totalSeconds);
 };
 
