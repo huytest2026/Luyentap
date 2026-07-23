@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Fix triệt để icon đồng hồ thừa ⏱️)
+// FILE: script.js (Đã khôi phục tính năng đếm Đúng/Sai & giữ nguyên các tiện ích)
 // ==========================================
 
 const AppState = {
@@ -22,12 +22,10 @@ function removeUnwantedClock() {
     
     while (node = walker.nextNode()) {
         let val = node.nodeValue || '';
-        // Tìm các đoạn text chứa '--:--' hoặc biểu tượng đồng hồ '⏱️'
         if (val.includes('--:--') || val.includes('⏱️')) {
             let parent = node.parentElement;
             let isInOurTimer = false;
             let p = parent;
-            // Kiểm tra xem có nằm trong khung đồng hồ chính của tool hay không
             while (p) {
                 if (p.id === 'timer-container') {
                     isInOurTimer = true;
@@ -35,7 +33,6 @@ function removeUnwantedClock() {
                 }
                 p = p.parentElement;
             }
-            // Nếu không nằm trong khung đồng hồ chính thì đưa vào danh sách cần dọn dẹp
             if (!isInOurTimer) {
                 nodesToClean.push(node);
             }
@@ -47,7 +44,6 @@ function removeUnwantedClock() {
         n.nodeValue = n.nodeValue.replace(/--:--/g, '').replace(/⏱️/g, '');
         if (parent && parent.textContent.trim() === '') {
             parent.style.display = 'none';
-            // Ẩn thêm thẻ cha cấp 1 nếu nó tạo thành một khung trống (box thừa)
             if (parent.parentElement && parent.parentElement.children.length === 1) {
                 parent.parentElement.style.display = 'none';
             }
@@ -55,8 +51,23 @@ function removeUnwantedClock() {
     });
 }
 
-// Chạy quét liên tục để triệt tiêu mọi thành phần đồng hồ/icon thừa do giao diện gốc chèn vào
-setInterval(removeUnwantedClock, 300);
+// Cập nhật hiển thị số câu Đúng / Sai lên giao diện gốc
+function updateScoreDisplay() {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    while (node = walker.nextNode()) {
+        let val = node.nodeValue || '';
+        if (val.includes('Đúng:') && val.includes('Sai:')) {
+            node.nodeValue = `Đúng: ${AppState.correctCount} | Sai: ${AppState.wrongCount}`;
+        }
+    }
+}
+
+// Chạy quét liên tục để triệt tiêu mọi thành phần đồng hồ/icon thừa và cập nhật điểm số realtime
+setInterval(() => {
+    removeUnwantedClock();
+    updateScoreDisplay();
+}, 300);
 
 (function injectStyles() {
     const style = document.createElement('style');
@@ -713,6 +724,7 @@ window.startQuiz = function() {
     AppState.correctCount = 0; 
     AppState.wrongCount = 0;
     AppState.wrongQuestions = [];
+    updateScoreDisplay(); // Reset hiển thị điểm Đúng/Sai trên giao diện gốc về 0
     
     const startScreen = document.getElementById('start-screen');
     if(startScreen) startScreen.style.display = 'none';
@@ -944,6 +956,8 @@ window.selectAnswer = function(index, optKey) {
         }
     }
 
+    updateScoreDisplay(); // Cập nhật số câu Đúng/Sai ngay lập tức lên giao diện
+
     let keys = item._shuffledKeys || ['a', 'b', 'c', 'd'];
     keys.forEach(k => {
         const el = document.getElementById(`q${index}-opt-${k}`);
@@ -980,6 +994,8 @@ window.checkVocaAnswer = function(index) {
         inputEl.style.background = '#f8d7da';
         inputEl.style.borderColor = '#dc3545';
     }
+
+    updateScoreDisplay(); // Cập nhật số câu Đúng/Sai ngay lập tức lên giao diện
 
     inputEl.disabled = true;
 
