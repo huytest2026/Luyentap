@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã cập nhật loại bỏ đồng hồ thừa --:--)
+// FILE: script.js (Đã cập nhật ẩn âm thanh Toán/TV & xóa triệt để đồng hồ thừa --:--)
 // ==========================================
 
 const AppState = {
@@ -13,6 +13,21 @@ const AppState = {
     wrongQuestions: [],
     isReadingComp: false
 };
+
+// Hàm tự động quét và xóa sạch đồng hồ thừa --:-- ở giao diện gốc
+function removeUnwantedClock() {
+    document.querySelectorAll('div, span, p, button').forEach(el => {
+        if (el && el.id !== 'timer-container' && el.textContent) {
+            let text = el.textContent.trim();
+            if (text === '--:--' || (text.includes('--:--') && !text.includes('Thời gian còn lại'))) {
+                el.remove();
+            }
+        }
+    });
+}
+
+// Chạy quét liên tục để triệt tiêu mọi thành phần đồng hồ thừa do giao diện gốc chèn vào
+setInterval(removeUnwantedClock, 100);
 
 (function injectStyles() {
     const style = document.createElement('style');
@@ -153,6 +168,9 @@ function standardizeSubject(monStr) {
     }
     if (cleanM.includes('toan') || cleanM.includes('math')) {
         return 'Toán';
+    }
+    if (cleanM.includes('tiengviet') || cleanM.includes('tv')) {
+        return 'Tiếng Việt';
     }
     return monStr.trim();
 }
@@ -300,7 +318,7 @@ window.updateMadePassagePreview = function() {
     let uniquePassages = {};
     passageItems.forEach(item => {
         if (!uniquePassages[item.chuDe]) {
-            uniquePassages[item.chuDe] = { passage: item.passage, made: item.made };
+            uniquePassages[item.chuDe] = { passage: item.passage, made: item.made, mon: item.mon };
         }
     });
 
@@ -308,13 +326,16 @@ window.updateMadePassagePreview = function() {
     for (let code in uniquePassages) {
         let data = uniquePassages[code];
         let pText = data.passage;
-        let itemMade = data.made;
+        let itemMon = standardizeSubject(data.mon);
         
-        let isTV = code.toUpperCase().includes('TV') || selectedMade.toUpperCase().includes('TV') || String(itemMade).toUpperCase().includes('TV');
+        let isMath = cleanKey(itemMon).includes('toan') || cleanKey(itemMon).includes('math');
+        let isVietnamese = cleanKey(itemMon).includes('tiengviet') || cleanKey(itemMon).includes('tv') || code.toUpperCase().startsWith('TV');
+        let omitSpeaker = isMath || isVietnamese;
+
         let isVi = code.toUpperCase().startsWith('TV') || isVietnameseText(pText);
         let lang = isVi ? 'vi-VN' : 'en-US';
 
-        let speakerBtnHtml = isTV ? '' : `<div>
+        let speakerBtnHtml = omitSpeaker ? '' : `<div>
             <button class="speaker-btn" data-question="${escapeHTML(pText)}" data-lang="${lang}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
         </div>`;
 
@@ -664,7 +685,6 @@ window.startQuiz = function() {
     if (quizScreen) {
         quizScreen.style.display = 'block';
         
-        // Loại bỏ các nút nộp bài thừa hoặc tĩnh
         const extraBtns = quizScreen.querySelectorAll('button');
         extraBtns.forEach(b => {
             if (b.textContent.includes('Nộp bài')) {
@@ -673,15 +693,7 @@ window.startQuiz = function() {
         });
     }
 
-    // LOẠI BỎ ĐỒNG HỒ DƯ THỪA HIỂN THỊ --:-- (Khung đỏ ở góc trái)
-    document.querySelectorAll('div, span').forEach(el => {
-        if (el.textContent && el.textContent.includes('--:--') && el.id !== 'timer-container') {
-            // Kiểm tra nếu là thẻ chứa đồng hồ thừa dạng như trong hình
-            if (el.children.length === 0 || el.textContent.trim().includes('--:--')) {
-                el.remove();
-            }
-        }
-    });
+    removeUnwantedClock();
     
     const oldResult = document.getElementById('result-container');
     if (oldResult) oldResult.remove();
@@ -701,14 +713,19 @@ window.renderQuiz = function() {
         let passage = item.passage;
         let chuDe = item.chuDe;
         let made = item.made;
+        let itemMon = standardizeSubject(item.mon);
+
+        // Kiểm tra xem môn học có phải là Toán hoặc Tiếng Việt không để ẩn nút âm thanh
+        let isMath = cleanKey(itemMon).includes('toan') || cleanKey(itemMon).includes('math');
+        let isVietnamese = cleanKey(itemMon).includes('tiengviet') || cleanKey(itemMon).includes('tv') || String(chuDe || '').toUpperCase().startsWith('TV') || String(made || '').toUpperCase().includes('TV');
+        let omitSpeaker = isMath || isVietnamese;
 
         if (passage && passage.trim() !== '' && !renderedPassages.has(passage)) {
             renderedPassages.add(passage);
             let isViPassage = String(chuDe || '').toUpperCase().startsWith('TV') || isVietnameseText(passage);
             let passageLang = isViPassage ? 'vi-VN' : 'en-US';
 
-            let isTVPassage = String(chuDe || '').toUpperCase().includes('TV') || String(made || '').toUpperCase().includes('TV');
-            let speakerBtnPassage = isTVPassage ? '' : `<div>
+            let speakerBtnPassage = omitSpeaker ? '' : `<div>
                 <button class="speaker-btn" data-question="${escapeHTML(passage)}" data-lang="${passageLang}" onclick="window.handleSpeak(this)">🔊 Nghe đoạn văn</button>
             </div>`;
 
@@ -731,13 +748,11 @@ window.renderQuiz = function() {
         let questionText = item.question;
         let explanationText = item.explanation || 'Không có giải thích.';
 
-        let isTV = String(chuDe || '').toUpperCase().includes('TV') || String(made || '').toUpperCase().includes('TV');
-
         let speakerBtn = '';
         let bodyHtml = '';
 
-        if (!isTV) {
-            if (cleanKey(item.mon) === cleanKey('Tiếng Anh')) {
+        if (!omitSpeaker) {
+            if (cleanKey(itemMon) === cleanKey('Tiếng Anh')) {
                 let chuDeLower = String(chuDe || '').toLowerCase();
                 let loaiLower = String(item.loai || '').toLowerCase();
                 
