@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Fix lỗi trắng trang & xóa đồng hồ an toàn tuyệt đối)
+// FILE: script.js (Fix triệt để icon đồng hồ thừa ⏱️)
 // ==========================================
 
 const AppState = {
@@ -14,35 +14,49 @@ const AppState = {
     isReadingComp: false
 };
 
-// Hàm tự động quét và xóa sạch đồng hồ thừa --:-- ở giao diện gốc (Phiên bản an toàn tuyệt đối 100%)
+// Hàm tự động quét và xóa sạch đồng hồ thừa, biểu tượng ⏱️ thừa từ giao diện gốc
 function removeUnwantedClock() {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
     let node;
     let nodesToClean = [];
     
-    // Tìm chính xác các đoạn chữ (Text Node) có chứa '--:--'
     while (node = walker.nextNode()) {
-        if (node.nodeValue && node.nodeValue.includes('--:--')) {
-            nodesToClean.push(node);
+        let val = node.nodeValue || '';
+        // Tìm các đoạn text chứa '--:--' hoặc biểu tượng đồng hồ '⏱️'
+        if (val.includes('--:--') || val.includes('⏱️')) {
+            let parent = node.parentElement;
+            let isInOurTimer = false;
+            let p = parent;
+            // Kiểm tra xem có nằm trong khung đồng hồ chính của tool hay không
+            while (p) {
+                if (p.id === 'timer-container') {
+                    isInOurTimer = true;
+                    break;
+                }
+                p = p.parentElement;
+            }
+            // Nếu không nằm trong khung đồng hồ chính thì đưa vào danh sách cần dọn dẹp
+            if (!isInOurTimer) {
+                nodesToClean.push(node);
+            }
         }
     }
     
     nodesToClean.forEach(n => {
         let parent = n.parentElement;
-        if (parent && parent.id === 'timer-container') return; // Bỏ qua đồng hồ chính của tool
-        
-        // Chỉ bôi xóa đúng đoạn chữ chứa đồng hồ, tuyệt đối không xóa thẻ HTML
-        n.nodeValue = n.nodeValue.replace(/--:--/g, '').replace(/⏱️?/g, '');
-        
-        // Sau khi xóa chữ, nếu thẻ chứa nó trống không thì mới ẩn đi để đỡ chiếm diện tích
+        n.nodeValue = n.nodeValue.replace(/--:--/g, '').replace(/⏱️/g, '');
         if (parent && parent.textContent.trim() === '') {
             parent.style.display = 'none';
+            // Ẩn thêm thẻ cha cấp 1 nếu nó tạo thành một khung trống (box thừa)
+            if (parent.parentElement && parent.parentElement.children.length === 1) {
+                parent.parentElement.style.display = 'none';
+            }
         }
     });
 }
 
-// Chạy quét liên tục để triệt tiêu mọi thành phần đồng hồ thừa do giao diện gốc chèn vào
-setInterval(removeUnwantedClock, 500);
+// Chạy quét liên tục để triệt tiêu mọi thành phần đồng hồ/icon thừa do giao diện gốc chèn vào
+setInterval(removeUnwantedClock, 300);
 
 (function injectStyles() {
     const style = document.createElement('style');
