@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã sửa lỗi hiển thị màu Đúng/Sai, ghim đồng hồ & lọc lặp đáp án)
+// FILE: script.js (Tạo thanh điều khiển riêng: Trang chủ, Đồng hồ, Đúng/Sai trong form)
 // ==========================================
 
 const AppState = {
@@ -14,66 +14,19 @@ const AppState = {
     isReadingComp: false
 };
 
-// Hàm tự động quét và xóa sạch đồng hồ thừa, biểu tượng ⏱️ thừa từ giao diện gốc
-function removeUnwantedClock() {
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-    let node;
-    let nodesToClean = [];
-    
-    while (node = walker.nextNode()) {
-        let val = node.nodeValue || '';
-        if (val.includes('--:--') || val.includes('⏱️')) {
-            let parent = node.parentElement;
-            let isInOurTimer = false;
-            let p = parent;
-            while (p) {
-                if (p.id === 'timer-container') {
-                    isInOurTimer = true;
-                    break;
-                }
-                p = p.parentElement;
-            }
-            if (!isInOurTimer) {
-                nodesToClean.push(node);
-            }
-        }
-    }
-    
-    nodesToClean.forEach(n => {
-        let parent = n.parentElement;
-        n.nodeValue = n.nodeValue.replace(/--:--/g, '').replace(/⏱️/g, '');
-        if (parent && parent.textContent.trim() === '') {
-            parent.style.display = 'none';
-            if (parent.parentElement && parent.parentElement.children.length === 1) {
-                parent.parentElement.style.display = 'none';
-            }
-        }
-    });
-}
-
-// Cập nhật hiển thị số câu Đúng (Xanh) / Sai (Đỏ) chuẩn màu sắc
-function updateScoreDisplay() {
-    const elements = document.querySelectorAll('div, span, b, strong, p, td');
-    for (let el of elements) {
-        let text = el.innerText || el.textContent || '';
-        if (text.includes('Đúng:') && text.includes('Sai:') && text.length < 60) {
-            el.innerHTML = `Đúng: <span style="color: #28a745; font-weight: bold;">${AppState.correctCount}</span> | Sai: <span style="color: #dc3545; font-weight: bold;">${AppState.wrongCount}</span>`;
-            break;
-        }
-    }
-}
-
 // Làm sạch tiền tố đáp án bị lặp (Ví dụ: dữ liệu gốc có sẵn "A. 9.8 cm" thì lọc bỏ chữ "A." thừa)
 function cleanOptionText(text) {
     if (!text) return '';
     return String(text).replace(/^[a-dA-D][\.\)]\s*/, '').trim();
 }
 
-// Chạy quét liên tục để triệt tiêu mọi thành phần đồng hồ/icon thừa và cập nhật điểm số realtime
-setInterval(() => {
-    removeUnwantedClock();
-    updateScoreDisplay();
-}, 300);
+// Cập nhật hiển thị số câu Đúng (Xanh) / Sai (Đỏ) vào thanh điều khiển của chúng ta
+function updateScoreDisplay() {
+    const correctEl = document.getElementById('custom-correct-count');
+    const wrongEl = document.getElementById('custom-wrong-count');
+    if (correctEl) correctEl.innerText = AppState.correctCount;
+    if (wrongEl) wrongEl.innerText = AppState.wrongCount;
+}
 
 (function injectStyles() {
     const style = document.createElement('style');
@@ -91,6 +44,53 @@ setInterval(() => {
         .speaker-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
         .speaker-btn:hover { background: #5a6268; }
         
+        /* Thanh điều khiển tuỳ chỉnh trong form làm bài */
+        .custom-quiz-header {
+            position: sticky;
+            top: 0;
+            background: #ffffff;
+            border: 2px solid #540606;
+            border-radius: 12px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .custom-header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .home-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9em;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .home-btn:hover { background: #5a6268; }
+        .timer-display {
+            font-weight: bold;
+            color: #dc3545;
+            font-size: 1.1em;
+        }
+        .score-display-box {
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.05em;
+            border-top: 1px solid #eee;
+            padding-top: 8px;
+        }
+
         .passage-box { 
             background: #ffffff; 
             border: 2px solid #540606; 
@@ -146,7 +146,7 @@ setInterval(() => {
         /* --- Dark Mode Styles --- */
         body.dark-mode { background-color: #121212 !important; color: #e0e0e0; transition: background 0.3s, color 0.3s; }
         body.dark-mode .container { background: #1e1e1e; color: #e0e0e0; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        body.dark-mode .quiz-card, body.dark-mode .passage-box, body.dark-mode .leaderboard-container { background: #2d2d2d; border-color: #777; color: #e0e0e0; }
+        body.dark-mode .quiz-card, body.dark-mode .passage-box, body.dark-mode .leaderboard-container, body.dark-mode .custom-quiz-header { background: #2d2d2d; border-color: #777; color: #e0e0e0; }
         body.dark-mode .option-box { background: #3a3a3a; border-color: #666; color: #e0e0e0; }
         body.dark-mode .option-box:hover { background: #4a4a4a; border-color: #888; }
         body.dark-mode input[type="text"], body.dark-mode select { background: #2d2d2d; color: #e0e0e0; border-color: #777; }
@@ -730,7 +730,6 @@ window.startQuiz = function() {
     AppState.correctCount = 0; 
     AppState.wrongCount = 0;
     AppState.wrongQuestions = [];
-    updateScoreDisplay(); 
     
     const startScreen = document.getElementById('start-screen');
     if(startScreen) startScreen.style.display = 'none';
@@ -739,21 +738,43 @@ window.startQuiz = function() {
     if (quizScreen) {
         quizScreen.style.display = 'block';
         
-        const extraBtns = quizScreen.querySelectorAll('button');
-        extraBtns.forEach(b => {
-            if (b.textContent.includes('Nộp bài')) {
-                b.remove();
-            }
-        });
+        // Tạo hoặc reset thanh điều khiển tùy chỉnh bên trong quiz-screen
+        let customHeader = document.getElementById('custom-quiz-header');
+        if (!customHeader) {
+            customHeader = document.createElement('div');
+            customHeader.id = 'custom-quiz-header';
+            customHeader.className = 'custom-quiz-header';
+            quizScreen.insertBefore(customHeader, quizScreen.firstChild);
+        }
+        customHeader.innerHTML = `
+            <div class="custom-header-top">
+                <button class="home-btn" onclick="window.returnHome()">🏠 Trang chủ</button>
+                <div class="timer-display" id="custom-timer-display">⏱️ Thời gian: 00:00</div>
+            </div>
+            <div class="score-display-box">
+                Đúng: <span id="custom-correct-count" style="color: #28a745; font-weight: bold;">0</span> | 
+                Sai: <span id="custom-wrong-count" style="color: #dc3545; font-weight: bold;">0</span>
+            </div>
+        `;
     }
-
-    removeUnwantedClock();
     
     const oldResult = document.getElementById('result-container');
     if (oldResult) oldResult.remove();
 
     window.renderQuiz();
     window.startTimerTotal(totalSeconds);
+};
+
+window.returnHome = function() {
+    if (confirm("Bạn có chắc chắn muốn rời khỏi bài thi để về trang chủ?")) {
+        clearInterval(AppState.timerInterval);
+        const quizScreen = document.getElementById('quiz-screen');
+        if (quizScreen) quizScreen.style.display = 'none';
+        const startScreen = document.getElementById('start-screen');
+        if (startScreen) startScreen.style.display = 'block';
+        const oldResult = document.getElementById('result-container');
+        if (oldResult) oldResult.remove();
+    }
 };
 
 window.renderQuiz = function() {
@@ -1014,28 +1035,29 @@ window.checkVocaAnswer = function(index) {
 
 window.startTimerTotal = function(durationSeconds) {
     clearInterval(AppState.timerInterval);
-    let timerContainer = document.getElementById('timer-container');
-    if (!timerContainer) {
-        timerContainer = document.createElement('div');
-        timerContainer.id = 'timer-container';
-        // Ghim cố định đồng hồ ở đầu màn hình (position: sticky; top: 0)
-        timerContainer.style.cssText = "font-size: 1.2em; font-weight: bold; color: #dc3545; margin-bottom: 15px; text-align: center; position: sticky; top: 0; background: #bbe9f0; padding: 10px; z-index: 1000; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);";
-        const quizScreen = document.getElementById('quiz-screen');
-        if (quizScreen) quizScreen.insertBefore(timerContainer, quizScreen.firstChild);
-    }
-
     let remainingTime = durationSeconds;
-    AppState.timerInterval = setInterval(() => {
+    
+    const timerDisplay = document.getElementById('custom-timer-display');
+    if (timerDisplay) {
         let minutes = Math.floor(remainingTime / 60);
         let seconds = remainingTime % 60;
-        timerContainer.innerHTML = `⏱️ Thời gian còn lại: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        timerDisplay.innerHTML = `⏱️ Thời gian: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
+
+    AppState.timerInterval = setInterval(() => {
+        remainingTime--;
+        let minutes = Math.floor(remainingTime / 60);
+        let seconds = remainingTime % 60;
+        
+        if (timerDisplay) {
+            timerDisplay.innerHTML = `⏱️ Thời gian: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        }
 
         if (remainingTime <= 0) {
             clearInterval(AppState.timerInterval);
             alert("Đã hết thời gian làm bài!");
             window.submitQuiz();
         }
-        remainingTime--;
     }, 1000);
 };
 
@@ -1092,8 +1114,7 @@ window.saveScoreToGoogleSheets = function(score) {
     };
 
     fetch(API_URL, {
-        method: 'POST',
-        mode: 'no-cors',
+        method: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dataToSend)
     }).catch(err => console.error("Lỗi gửi điểm:", err));
