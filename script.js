@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã khôi phục tính năng đếm Đúng/Sai & giữ nguyên các tiện ích)
+// FILE: script.js (Đã sửa lỗi cập nhật số Đúng/Sai theo thời gian thực)
 // ==========================================
 
 const AppState = {
@@ -51,14 +51,31 @@ function removeUnwantedClock() {
     });
 }
 
-// Cập nhật hiển thị số câu Đúng / Sai lên giao diện gốc
+// Cập nhật hiển thị số câu Đúng / Sai lên giao diện gốc (Hỗ trợ cả trường hợp bị tách thẻ HTML)
 function updateScoreDisplay() {
+    let updated = false;
+    
+    // 1. Thử tìm qua TextNode chứa cả 2 từ khóa
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
     let node;
     while (node = walker.nextNode()) {
         let val = node.nodeValue || '';
         if (val.includes('Đúng:') && val.includes('Sai:')) {
             node.nodeValue = `Đúng: ${AppState.correctCount} | Sai: ${AppState.wrongCount}`;
+            updated = true;
+            break;
+        }
+    }
+
+    // 2. Nếu không tìm thấy (do bị tách thẻ HTML con), tìm element chứa đoạn text này rồi cập nhật innerText trực tiếp
+    if (!updated) {
+        const elements = document.querySelectorAll('div, span, b, strong, p, td');
+        for (let el of elements) {
+            let text = el.innerText || el.textContent || '';
+            if (text.includes('Đúng:') && text.includes('Sai:') && text.length < 60) {
+                el.innerText = `Đúng: ${AppState.correctCount} | Sai: ${AppState.wrongCount}`;
+                break;
+            }
         }
     }
 }
@@ -724,7 +741,7 @@ window.startQuiz = function() {
     AppState.correctCount = 0; 
     AppState.wrongCount = 0;
     AppState.wrongQuestions = [];
-    updateScoreDisplay(); // Reset hiển thị điểm Đúng/Sai trên giao diện gốc về 0
+    updateScoreDisplay(); 
     
     const startScreen = document.getElementById('start-screen');
     if(startScreen) startScreen.style.display = 'none';
@@ -956,7 +973,7 @@ window.selectAnswer = function(index, optKey) {
         }
     }
 
-    updateScoreDisplay(); // Cập nhật số câu Đúng/Sai ngay lập tức lên giao diện
+    updateScoreDisplay();
 
     let keys = item._shuffledKeys || ['a', 'b', 'c', 'd'];
     keys.forEach(k => {
@@ -995,7 +1012,7 @@ window.checkVocaAnswer = function(index) {
         inputEl.style.borderColor = '#dc3545';
     }
 
-    updateScoreDisplay(); // Cập nhật số câu Đúng/Sai ngay lập tức lên giao diện
+    updateScoreDisplay();
 
     inputEl.disabled = true;
 
