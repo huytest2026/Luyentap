@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã cập nhật sửa lỗi Mã đề & Nút nộp bài)
+// FILE: script.js (Đã cập nhật loại bỏ đồng hồ thừa --:--)
 // ==========================================
 
 const AppState = {
@@ -587,19 +587,17 @@ window.startQuiz = function() {
     let totalSeconds = 10 * 60;
 
     if (selectedMade) {
-        // Khi chọn Mã đề: Lấy TẤT CẢ câu hỏi thuộc mã đề đó (bao nhiêu chọn bấy nhiêu), thời gian cố định 45 phút
         rawSelectedQuestions = AppState.allQuizData.filter(i => {
             const isSameSubject = (cleanKey(i.mon) === cleanKey(mon));
             const isMadeMatch = (String(i.made).trim() === selectedMade);
             return isSameSubject && isMadeMatch && i.question !== '';
         });
-        totalSeconds = 45 * 60; // 45 phút cho Mã đề
+        totalSeconds = 45 * 60; 
         isReadingComp = rawSelectedQuestions.some(i => {
             let u = String(i.chuDe || '').toUpperCase();
             return u.startsWith('DH') || u.startsWith('TV');
         });
     } else {
-        // Khi không chọn Mã đề: chọn theo chủ đề, giới hạn 20 câu đối với phần thường
         const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
         
@@ -662,10 +660,11 @@ window.startQuiz = function() {
     
     document.getElementById('start-screen').style.display = 'none';
     
-    // Dọn dẹp các nút nộp bài thừa hoặc tĩnh bên ngoài trước khi hiển thị màn hình quiz
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) {
         quizScreen.style.display = 'block';
+        
+        // Loại bỏ các nút nộp bài thừa hoặc tĩnh
         const extraBtns = quizScreen.querySelectorAll('button');
         extraBtns.forEach(b => {
             if (b.textContent.includes('Nộp bài')) {
@@ -673,6 +672,16 @@ window.startQuiz = function() {
             }
         });
     }
+
+    // LOẠI BỎ ĐỒNG HỒ DƯ THỪA HIỂN THỊ --:-- (Khung đỏ ở góc trái)
+    document.querySelectorAll('div, span').forEach(el => {
+        if (el.textContent && el.textContent.includes('--:--') && el.id !== 'timer-container') {
+            // Kiểm tra nếu là thẻ chứa đồng hồ thừa dạng như trong hình
+            if (el.children.length === 0 || el.textContent.trim().includes('--:--')) {
+                el.remove();
+            }
+        }
+    });
     
     const oldResult = document.getElementById('result-container');
     if (oldResult) oldResult.remove();
