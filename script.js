@@ -179,14 +179,38 @@ window.toggleMadeMode = function() {
     const madeContainer = document.getElementById('made-container');
     const madeSelect = document.getElementById('made-select');
     
+    // Tìm các phần tử hiển thị chọn chủ đề để ẩn/hiện
+    // Thường bao gồm label "Chọn chủ đề:", nút chọn tất cả, và hộp chứa chủ đề (#topic-container hoặc bao quanh nó)
+    const topicSectionLabels = document.querySelectorAll('label, div');
+    
+    // Tìm block chứa "Chọn chủ đề" bằng cách duyệt qua các phần tử trên giao diện
+    const topicContainer = document.getElementById('topic-container');
+    const topicHeaderLabel = Array.from(document.querySelectorAll('div, label')).find(el => el.textContent.trim().startsWith('Chọn chủ đề:'));
+    const topicSelectAllBtn = document.querySelector('button[onclick*="toggleAllTopics"]') || document.getElementById('select-all-topics-btn');
+
     if (!checkbox || !madeContainer) return;
     
     if (checkbox.checked) {
         madeContainer.style.display = 'block';
+        // Ẩn phần chọn chủ đề
+        if (topicContainer && topicContainer.parentElement) {
+            // Ẩn cả cụm chọn chủ đề nếu muốn, hoặc ẩn riêng từng thành phần
+            if (topicHeaderLabel) topicHeaderLabel.style.display = 'none';
+            if (topicSelectAllBtn) topicSelectAllBtn.style.display = 'none';
+            topicContainer.style.display = 'none';
+        }
         window.updateMadePassagePreview();
     } else {
         madeContainer.style.display = 'none';
         if (madeSelect) madeSelect.value = '';
+        
+        // Hiện lại phần chọn chủ đề
+        if (topicContainer) {
+            if (topicHeaderLabel) topicHeaderLabel.style.display = '';
+            if (topicSelectAllBtn) topicSelectAllBtn.style.display = '';
+            topicContainer.style.display = '';
+        }
+
         window.handleMadeChange();
     }
 };
@@ -203,6 +227,16 @@ window.handleSubjectChange = function() {
     if (toggleMade) toggleMade.checked = false;
     if (madeContainer) madeContainer.style.display = 'none';
     if (madeSelect) madeSelect.value = '';
+
+    // Đảm bảo phần chủ đề hiện lại khi đổi môn nếu chưa bật mã đề
+    const topicContainer = document.getElementById('topic-container');
+    const topicHeaderLabel = Array.from(document.querySelectorAll('div, label')).find(el => el.textContent.trim().startsWith('Chọn chủ đề:'));
+    const topicSelectAllBtn = document.querySelector('button[onclick*="toggleAllTopics"]');
+    if (topicContainer) {
+        if (topicHeaderLabel) topicHeaderLabel.style.display = '';
+        if (topicSelectAllBtn) topicSelectAllBtn.style.display = '';
+        topicContainer.style.display = '';
+    }
 
     window.updateMadePassagePreview();
     window.updateTopicList();
@@ -479,7 +513,6 @@ window.renderQuiz = function() {
             }).join('');
         }
 
-        // Kiểm tra nếu là môn Tiếng Việt thì không hiển thị nút Nghe
         const isVietnamese = cleanKey(item.mon).includes('tiengviet') || cleanKey(item.mon).includes('tv');
         let speechBtnHtml = isVietnamese ? '' : `<button type="button" class="speech-btn" onclick="window.speakQuestion(${index})">🔊 Nghe</button>`;
 
