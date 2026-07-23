@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã cấu hình lại số câu/thời gian theo môn, ngẫu nhiên & xáo trộn đáp án)
+// FILE: script.js (Đã phục hồi chức năng chọn Mã đề & cấu hình số câu/thời gian)
 // ==========================================
 
 const AppState = {
@@ -313,9 +313,26 @@ window.handleSubjectChange = function() {
     const levelContainer = document.getElementById('level-container');
     if (levelContainer) levelContainer.style.display = (mon === 'Tiếng Anh') ? 'block' : 'none';
     window.updateTopicList();
-    window.updateLevelOptions();
-    window.renderLeaderboard(mon);
     window.updateMadePassagePreview();
+    if (typeof window.updateLevelOptions === 'function') window.updateLevelOptions();
+    window.renderLeaderboard(mon);
+};
+
+window.updateMadePassagePreview = function() {
+    const monSelect = document.getElementById('subject-select') ? document.getElementById('subject-select').value.trim() : '';
+    const madeSelect = document.getElementById('made-select');
+    if (!madeSelect) return;
+    if (!monSelect) {
+        madeSelect.innerHTML = '<option value="">-- Chọn mã đề --</option>';
+        return;
+    }
+    const cleanMon = cleanKey(monSelect);
+    const mades = [...new Set(AppState.allQuizData
+        .filter(i => cleanKey(i.mon) === cleanMon && i.made && String(i.made).trim() !== '')
+        .map(i => String(i.made).trim())
+    )];
+    madeSelect.innerHTML = `<option value="">-- Chọn mã đề (hoặc làm theo chủ đề) --</option>` + 
+        mades.map(m => `<option value="${escapeHTML(m)}">Mã đề: ${escapeHTML(m)}</option>`).join('');
 };
 
 window.updateTopicList = function() {
@@ -403,6 +420,7 @@ window.handleQuizData = function(data) {
 
     window.renderLeaderboard();
     window.updateTopicList();
+    window.updateMadePassagePreview();
 };
 
 window.renderLeaderboard = function(subjectFilter = null) {
@@ -459,10 +477,10 @@ window.startQuiz = function() {
         let targetCount = 10;
         if (cleanM === 'Tiếng Anh') {
             targetCount = 20;
-            totalSeconds = 10 * 60; // 10 phút
+            totalSeconds = 10 * 60; // 10 phút cho Tiếng Anh
         } else if (cleanM === 'Toán') {
             targetCount = 10;
-            totalSeconds = 20 * 60; // 20 phút
+            totalSeconds = 20 * 60; // 20 phút cho Toán
         } else {
             totalSeconds = 10 * 60;
         }
