@@ -327,7 +327,7 @@ window.handleQuizData = function(data) {
         if (item.made) lastMade = item.made; else if (lastMade) item.made = lastMade;
         if (item.passage) lastPassage = item.passage; else if (lastPassage) item.passage = lastPassage;
         return item;
-    }).filter(item => item && item.question !== '' && item.mon !== '');
+    }).filter(item => item && item.question !== '' && item.mon !== '' && cleanKey(item.mon) !== 'id'); // Lọc bỏ dòng có môn là 'id'
 
     AppState.userPermissions = (data.permissions || []).map(p => ({
         maHS: String(p.maHS || p[0] || '').trim(),
@@ -339,7 +339,8 @@ window.handleQuizData = function(data) {
 
     const subjectSelect = document.getElementById('subject-select');
     if (subjectSelect) {
-        const subjects = [...new Set(AppState.allQuizData.map(i => i.mon).filter(Boolean))];
+        // Lọc bỏ hẳn chữ 'id' ra khỏi danh sách hiển thị
+        const subjects = [...new Set(AppState.allQuizData.map(i => i.mon).filter(s => s && cleanKey(s) !== 'id'))];
         subjectSelect.innerHTML = `<option value="">-- Chọn môn --</option>` + subjects.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
     }
 
