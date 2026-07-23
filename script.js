@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã sửa lỗi cập nhật số Đúng/Sai theo thời gian thực)
+// FILE: script.js (Đã sửa lỗi hiển thị màu Đúng/Sai, ghim đồng hồ & lọc lặp đáp án)
 // ==========================================
 
 const AppState = {
@@ -51,33 +51,22 @@ function removeUnwantedClock() {
     });
 }
 
-// Cập nhật hiển thị số câu Đúng / Sai lên giao diện gốc (Hỗ trợ cả trường hợp bị tách thẻ HTML)
+// Cập nhật hiển thị số câu Đúng (Xanh) / Sai (Đỏ) chuẩn màu sắc
 function updateScoreDisplay() {
-    let updated = false;
-    
-    // 1. Thử tìm qua TextNode chứa cả 2 từ khóa
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-    let node;
-    while (node = walker.nextNode()) {
-        let val = node.nodeValue || '';
-        if (val.includes('Đúng:') && val.includes('Sai:')) {
-            node.nodeValue = `Đúng: ${AppState.correctCount} | Sai: ${AppState.wrongCount}`;
-            updated = true;
+    const elements = document.querySelectorAll('div, span, b, strong, p, td');
+    for (let el of elements) {
+        let text = el.innerText || el.textContent || '';
+        if (text.includes('Đúng:') && text.includes('Sai:') && text.length < 60) {
+            el.innerHTML = `Đúng: <span style="color: #28a745; font-weight: bold;">${AppState.correctCount}</span> | Sai: <span style="color: #dc3545; font-weight: bold;">${AppState.wrongCount}</span>`;
             break;
         }
     }
+}
 
-    // 2. Nếu không tìm thấy (do bị tách thẻ HTML con), tìm element chứa đoạn text này rồi cập nhật innerText trực tiếp
-    if (!updated) {
-        const elements = document.querySelectorAll('div, span, b, strong, p, td');
-        for (let el of elements) {
-            let text = el.innerText || el.textContent || '';
-            if (text.includes('Đúng:') && text.includes('Sai:') && text.length < 60) {
-                el.innerText = `Đúng: ${AppState.correctCount} | Sai: ${AppState.wrongCount}`;
-                break;
-            }
-        }
-    }
+// Làm sạch tiền tố đáp án bị lặp (Ví dụ: dữ liệu gốc có sẵn "A. 9.8 cm" thì lọc bỏ chữ "A." thừa)
+function cleanOptionText(text) {
+    if (!text) return '';
+    return String(text).replace(/^[a-dA-D][\.\)]\s*/, '').trim();
 }
 
 // Chạy quét liên tục để triệt tiêu mọi thành phần đồng hồ/icon thừa và cập nhật điểm số realtime
@@ -648,7 +637,7 @@ function getOriginalCorrectKey(item) {
         return upper.toLowerCase();
     }
     for (let key of ['a', 'b', 'c', 'd']) {
-        if (item[key] && String(item[key]).trim().toLowerCase() === raw.toLowerCase()) {
+        if (item[key] && cleanOptionText(String(item[key])).toLowerCase() === cleanOptionText(raw).toLowerCase()) {
             return key;
         }
     }
@@ -859,9 +848,10 @@ window.renderQuiz = function() {
                     bodyHtml = keysToRender.map((optKey, displayIndex) => {
                         if (!item[optKey]) return '';
                         let displayLetter = String.fromCharCode(65 + displayIndex);
+                        let cleanText = cleanOptionText(item[optKey]);
                         return `
                             <div class="option-box" onclick="window.selectAnswer(${index}, '${optKey}')" id="q${index}-opt-${optKey}">
-                                <b>${displayLetter}.</b> ${escapeHTML(item[optKey])}
+                                <b>${displayLetter}.</b> ${escapeHTML(cleanText)}
                             </div>
                         `;
                     }).join('');
@@ -874,9 +864,10 @@ window.renderQuiz = function() {
                 bodyHtml = keysToRender.map((optKey, displayIndex) => {
                     if (!item[optKey]) return '';
                     let displayLetter = String.fromCharCode(65 + displayIndex);
+                    let cleanText = cleanOptionText(item[optKey]);
                     return `
                         <div class="option-box" onclick="window.selectAnswer(${index}, '${optKey}')" id="q${index}-opt-${optKey}">
-                            <b>${displayLetter}.</b> ${escapeHTML(item[optKey])}
+                            <b>${displayLetter}.</b> ${escapeHTML(cleanText)}
                         </div>
                     `;
                 }).join('');
@@ -894,9 +885,10 @@ window.renderQuiz = function() {
                 bodyHtml = keysToRender.map((optKey, displayIndex) => {
                     if (!item[optKey]) return '';
                     let displayLetter = String.fromCharCode(65 + displayIndex);
+                    let cleanText = cleanOptionText(item[optKey]);
                     return `
                         <div class="option-box" onclick="window.selectAnswer(${index}, '${optKey}')" id="q${index}-opt-${optKey}">
-                            <b>${displayLetter}.</b> ${escapeHTML(item[optKey])}
+                            <b>${displayLetter}.</b> ${escapeHTML(cleanText)}
                         </div>
                     `;
                 }).join('');
@@ -1026,7 +1018,8 @@ window.startTimerTotal = function(durationSeconds) {
     if (!timerContainer) {
         timerContainer = document.createElement('div');
         timerContainer.id = 'timer-container';
-        timerContainer.style.cssText = "font-size: 1.2em; font-weight: bold; color: #dc3545; margin-bottom: 15px; text-align: center;";
+        // Ghim cố định đồng hồ ở đầu màn hình (position: sticky; top: 0)
+        timerContainer.style.cssText = "font-size: 1.2em; font-weight: bold; color: #dc3545; margin-bottom: 15px; text-align: center; position: sticky; top: 0; background: #bbe9f0; padding: 10px; z-index: 1000; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);";
         const quizScreen = document.getElementById('quiz-screen');
         if (quizScreen) quizScreen.insertBefore(timerContainer, quizScreen.firstChild);
     }
