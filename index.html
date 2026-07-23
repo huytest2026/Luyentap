@@ -53,11 +53,18 @@
         </select>
     </div>
 
-    <!-- KHUNG CHỌN MÃ ĐỀ (MADE) -->
-    <div id="made-container" style="display: none;">
-        <label style="display:block; margin-top:10px; font-weight: bold; color: #540606;">Chọn Mã đề (MADE):</label>
-        <select id="made-select" onchange="window.handleMadeChange()" style="width: 100%; padding: 10px; margin: 10px 0;">
-            <option value="">-- Tất cả mã đề / Mặc định --</option>
+    <!-- NÚT BẬT/TẮT CHỌN MÃ ĐỀ -->
+    <div style="margin-top: 15px; margin-bottom: 5px; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #540606;">
+        <label style="cursor: pointer; font-weight: bold; color: #540606; display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="toggle-made" onchange="window.toggleMadeMode()" style="width: 18px; height: 18px; cursor: pointer;"> 
+            Làm bài theo Mã đề (MADE) riêng
+        </label>
+    </div>
+
+    <!-- KHUNG CHỌN MÃ ĐỀ (Ẩn/Hiện bằng checkbox) -->
+    <div id="made-container" style="display: none; margin-bottom: 10px;">
+        <select id="made-select" onchange="window.handleMadeChange()" style="width: 100%; padding: 10px; margin: 5px 0;">
+            <option value="">-- Chọn mã đề --</option>
         </select>
         <div id="made-passage-preview"></div>
     </div>
