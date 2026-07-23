@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã cập nhật ẩn âm thanh Toán/TV & xóa triệt để đồng hồ thừa --:--)
+// FILE: script.js (Fix lỗi trắng trang & xóa đồng hồ an toàn tuyệt đối)
 // ==========================================
 
 const AppState = {
@@ -14,20 +14,35 @@ const AppState = {
     isReadingComp: false
 };
 
-// Hàm tự động quét và xóa sạch đồng hồ thừa --:-- ở giao diện gốc
+// Hàm tự động quét và xóa sạch đồng hồ thừa --:-- ở giao diện gốc (Phiên bản an toàn tuyệt đối 100%)
 function removeUnwantedClock() {
-    document.querySelectorAll('div, span, p, button').forEach(el => {
-        if (el && el.id !== 'timer-container' && el.textContent) {
-            let text = el.textContent.trim();
-            if (text === '--:--' || (text.includes('--:--') && !text.includes('Thời gian còn lại'))) {
-                el.remove();
-            }
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    let nodesToClean = [];
+    
+    // Tìm chính xác các đoạn chữ (Text Node) có chứa '--:--'
+    while (node = walker.nextNode()) {
+        if (node.nodeValue && node.nodeValue.includes('--:--')) {
+            nodesToClean.push(node);
+        }
+    }
+    
+    nodesToClean.forEach(n => {
+        let parent = n.parentElement;
+        if (parent && parent.id === 'timer-container') return; // Bỏ qua đồng hồ chính của tool
+        
+        // Chỉ bôi xóa đúng đoạn chữ chứa đồng hồ, tuyệt đối không xóa thẻ HTML
+        n.nodeValue = n.nodeValue.replace(/--:--/g, '').replace(/⏱️?/g, '');
+        
+        // Sau khi xóa chữ, nếu thẻ chứa nó trống không thì mới ẩn đi để đỡ chiếm diện tích
+        if (parent && parent.textContent.trim() === '') {
+            parent.style.display = 'none';
         }
     });
 }
 
 // Chạy quét liên tục để triệt tiêu mọi thành phần đồng hồ thừa do giao diện gốc chèn vào
-setInterval(removeUnwantedClock, 100);
+setInterval(removeUnwantedClock, 500);
 
 (function injectStyles() {
     const style = document.createElement('style');
@@ -392,7 +407,7 @@ window.updateLevelOptions = function() {
 };
 
 window.updateTopicList = function() {
-    const monSelect = document.getElementById('subject-select').value.trim();
+    const monSelect = document.getElementById('subject-select') ? document.getElementById('subject-select').value.trim() : '';
     const maHS = document.getElementById('student-code').value.trim();
     const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
     const container = document.getElementById('topic-container');
@@ -599,7 +614,13 @@ function getOriginalCorrectKey(item) {
 }
 
 window.startQuiz = function() {
-    const mon = document.getElementById('subject-select').value;
+    const monSelect = document.getElementById('subject-select');
+    const mon = monSelect ? monSelect.value : '';
+    
+    if (!mon) {
+        return alert("Vui lòng chọn môn học trước khi bắt đầu!");
+    }
+
     const levelSelected = document.getElementById('level-select') ? document.getElementById('level-select').value : '';
     const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
     
@@ -679,7 +700,8 @@ window.startQuiz = function() {
     AppState.wrongCount = 0;
     AppState.wrongQuestions = [];
     
-    document.getElementById('start-screen').style.display = 'none';
+    const startScreen = document.getElementById('start-screen');
+    if(startScreen) startScreen.style.display = 'none';
     
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) {
@@ -715,7 +737,6 @@ window.renderQuiz = function() {
         let made = item.made;
         let itemMon = standardizeSubject(item.mon);
 
-        // Kiểm tra xem môn học có phải là Toán hoặc Tiếng Việt không để ẩn nút âm thanh
         let isMath = cleanKey(itemMon).includes('toan') || cleanKey(itemMon).includes('math');
         let isVietnamese = cleanKey(itemMon).includes('tiengviet') || cleanKey(itemMon).includes('tv') || String(chuDe || '').toUpperCase().startsWith('TV') || String(made || '').toUpperCase().includes('TV');
         let omitSpeaker = isMath || isVietnamese;
@@ -1016,7 +1037,8 @@ window.submitQuiz = function() {
 
 window.saveScoreToGoogleSheets = function(score) {
     const maHS = document.getElementById('student-code').value.trim();
-    const mon = document.getElementById('subject-select').value;
+    const monSelect = document.getElementById('subject-select');
+    const mon = monSelect ? monSelect.value : '';
     const levelSelected = document.getElementById('level-select') ? document.getElementById('level-select').value : '';
     
     const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
