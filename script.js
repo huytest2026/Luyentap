@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã thêm tổng số câu)
+// FILE: script.js (Đã hỗ trợ cả câu hỏi trắc nghiệm lẫn tự luận nhập chữ)
 // ==========================================
 
 const AppState = {
@@ -39,8 +39,6 @@ function updateScoreDisplay() {
         .medal { font-size: 1.2em; margin-right: 10px; }
         .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
         .time-text { font-size: 0.8em; color: #888; display: block; }
-        .speaker-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-bottom: 10px; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
-        .speaker-btn:hover { background: #5a6268; }
         
         .custom-quiz-header {
             position: sticky;
@@ -191,10 +189,6 @@ function standardizeSubject(monStr) {
     if (cleanM.includes('toan') || cleanM.includes('math')) return 'Toán';
     if (cleanM.includes('tiengviet') || cleanM.includes('tv')) return 'Tiếng Việt';
     return monStr.trim();
-}
-
-function isVietnameseText(text) {
-    return /[àáảãạăắằẳẵặâấầẩẫậèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđĐ]/i.test(text);
 }
 
 function normalizeItem(item) {
@@ -433,14 +427,12 @@ window.startQuiz = function() {
     if (quizScreen) {
         quizScreen.style.display = 'block';
         
-        // TỰ ĐỘNG XÓA SẠCH CÁC PHẦN DƯ THỪA CŨ (KHUNG ĐỎ) TRONG QUIZ-SCREEN
         Array.from(quizScreen.children).forEach(child => {
             if (child.id !== 'custom-quiz-header' && child.id !== 'quiz') {
                 child.remove();
             }
         });
 
-        // Tạo mới thanh điều khiển độc nhất nếu chưa có
         let customHeader = document.getElementById('custom-quiz-header');
         if (!customHeader) {
             customHeader = document.createElement('div');
@@ -500,16 +492,29 @@ window.renderQuiz = function() {
         }
 
         let keysToRender = item._shuffledKeys || ['a', 'b', 'c', 'd'].filter(k => item[k]);
-        let bodyHtml = keysToRender.map((optKey, displayIndex) => {
-            if (!item[optKey]) return '';
-            let displayLetter = String.fromCharCode(65 + displayIndex);
-            let cleanText = cleanOptionText(item[optKey]);
-            return `
-                <div class="option-box" onclick="window.selectAnswer(${index}, '${optKey}')" id="q${index}-opt-${optKey}">
-                    <b>${displayLetter}.</b> ${escapeHTML(cleanText)}
+        let bodyHtml = '';
+
+        if (keysToRender.length === 0) {
+            // Dạng câu hỏi tự luận / điền từ vựng (không có A, B, C, D)
+            bodyHtml = `
+                <div style="margin-top: 12px;">
+                    <input type="text" id="input-answer-${index}" placeholder="Nhập đáp án của bạn..." style="margin-bottom: 8px;" onkeydown="if(event.key==='Enter') window.submitTextAnswer(${index})">
+                    <button onclick="window.submitTextAnswer(${index})" style="padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Gửi đáp án</button>
                 </div>
             `;
-        }).join('');
+        } else {
+            // Dạng trắc nghiệm thông thường
+            bodyHtml = keysToRender.map((optKey, displayIndex) => {
+                if (!item[optKey]) return '';
+                let displayLetter = String.fromCharCode(65 + displayIndex);
+                let cleanText = cleanOptionText(item[optKey]);
+                return `
+                    <div class="option-box" onclick="window.selectAnswer(${index}, '${optKey}')" id="q${index}-opt-${optKey}">
+                        <b>${displayLetter}.</b> ${escapeHTML(cleanText)}
+                    </div>
+                `;
+            }).join('');
+        }
 
         html += `
             <div class="quiz-card" id="question-card-${index}">
@@ -559,6 +564,41 @@ window.selectAnswer = function(index, optKey) {
 
     const expBox = document.getElementById(`explanation-${index}`);
     if (expBox) expBox.style.display = 'block';
+};
+
+window.submitTextAnswer = function(index) {
+    const item = AppState.currentQuizData[index];
+    if (item._isAnswered) return;
+
+    const inputEl = document.getElementById(`input-answer-${index}`);
+    if (!inputEl) return;
+    let userVal = inputEl.value.trim();
+    if (!userVal) return alert("Vui lòng nhập câu trả lời!");
+
+    item._isAnswered = true;
+    item._userAnswer = userVal;
+
+    let correctVal = String(item.correct || '').trim();
+    let isCorrect = removeDiacritics(userVal).toLowerCase() === removeDiacritics(correctVal).toLowerCase();
+
+    if (isCorrect) {
+        AppState.correctCount++;
+        inputEl.style.background = '#d4edda';
+        inputEl.style.borderColor = '#28a745';
+    } else {
+        AppState.wrongCount++;
+        inputEl.style.background = '#f8d7da';
+        inputEl.style.borderColor = '#dc3545';
+    }
+    inputEl.disabled = true;
+
+    updateScoreDisplay();
+
+    const expBox = document.getElementById(`explanation-${index}`);
+    if (expBox) {
+        expBox.innerHTML = `<b>💡 Đáp án đúng:</b> ${escapeHTML(correctVal)}<br><b>💡 Giải thích:</b> ${escapeHTML(item.explanation || 'Không có giải thích.')}`;
+        expBox.style.display = 'block';
+    }
 };
 
 window.startTimerTotal = function(durationSeconds) {
