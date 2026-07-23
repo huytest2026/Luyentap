@@ -1,7 +1,3 @@
-// ==========================================
-// FILE: script.js (Chuẩn hóa toàn diện, fix hiển thị Mã đề)
-// ==========================================
-
 const AppState = {
     allQuizData: [],
     userPermissions: [],
@@ -178,14 +174,37 @@ window.toggleDarkMode = function() {
     if (btn) btn.innerHTML = isDark ? '☀️ Sáng' : '🌙 Tối';
 };
 
+// Hàm xử lý ẩn/hiện khung chọn Mã đề khi bấm Checkbox
+window.toggleMadeMode = function() {
+    const checkbox = document.getElementById('toggle-made');
+    const madeContainer = document.getElementById('made-container');
+    const madeSelect = document.getElementById('made-select');
+    
+    if (!checkbox || !madeContainer) return;
+    
+    if (checkbox.checked) {
+        madeContainer.style.display = 'block';
+        window.updateMadePassagePreview();
+    } else {
+        madeContainer.style.display = 'none';
+        if (madeSelect) madeSelect.value = '';
+        window.handleMadeChange(); // Reset lại giao diện và chủ đề
+    }
+};
+
 window.handleSubjectChange = function() {
     const mon = document.getElementById('subject-select').value;
     const levelContainer = document.getElementById('level-container');
     if (levelContainer) levelContainer.style.display = (mon === 'Tiếng Anh') ? 'block' : 'none';
     
-    // Hiển thị khung Mã đề khi có môn học được chọn
+    // Reset lại trạng thái chọn mã đề khi đổi môn
+    const toggleMade = document.getElementById('toggle-made');
     const madeContainer = document.getElementById('made-container');
-    if (madeContainer) madeContainer.style.display = mon ? 'block' : 'none';
+    const madeSelect = document.getElementById('made-select');
+    
+    if (toggleMade) toggleMade.checked = false;
+    if (madeContainer) madeContainer.style.display = 'none';
+    if (madeSelect) madeSelect.value = '';
 
     window.updateMadePassagePreview();
     window.updateTopicList();
@@ -197,7 +216,7 @@ window.updateMadePassagePreview = function() {
     const madeSelect = document.getElementById('made-select');
     if (!madeSelect) return;
     if (!monSelect) {
-        madeSelect.innerHTML = '<option value="">-- Tất cả mã đề / Mặc định --</option>';
+        madeSelect.innerHTML = '<option value="">-- Chọn mã đề --</option>';
         return;
     }
     const cleanMon = cleanKey(monSelect);
@@ -206,12 +225,13 @@ window.updateMadePassagePreview = function() {
         .map(i => String(i.made).trim())
     )];
     
-    madeSelect.innerHTML = `<option value="">-- Tất cả mã đề / Mặc định --</option>` + 
+    madeSelect.innerHTML = `<option value="">-- Chọn mã đề --</option>` + 
         mades.map(m => `<option value="${escapeHTML(m)}">Mã đề: ${escapeHTML(m)}</option>`).join('');
 }
 
 window.handleMadeChange = function() {
-    const selectedMade = document.getElementById('made-select').value.trim();
+    const toggleMade = document.getElementById('toggle-made');
+    const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
     const previewDiv = document.getElementById('made-passage-preview');
     if (!previewDiv) return;
 
@@ -237,12 +257,13 @@ window.handleMadeChange = function() {
 window.updateTopicList = function() {
     const monSelect = document.getElementById('subject-select') ? document.getElementById('subject-select').value.trim() : '';
     const maHS = document.getElementById('student-code').value.trim();
-    const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
+    const toggleMade = document.getElementById('toggle-made');
+    const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
     const container = document.getElementById('topic-container');
     if (!container || !monSelect) return;
 
     if (selectedMade) {
-        container.innerHTML = `<i style="color: #666;">Đã chọn Mã đề [${escapeHTML(selectedMade)}]. Sẽ làm toàn bộ câu hỏi theo mã đề này.</i>`;
+        container.innerHTML = `<i style="color: #666;">Đang bật chế độ làm theo Mã đề [${escapeHTML(selectedMade)}]. Sẽ làm toàn bộ câu hỏi theo mã đề này.</i>`;
         return;
     }
 
@@ -361,7 +382,9 @@ window.startQuiz = function() {
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
-    const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
+    const toggleMade = document.getElementById('toggle-made');
+    const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
+    
     let rawSelectedQuestions = [];
     let totalSeconds = 10 * 60;
     const cleanM = standardizeSubject(mon);
@@ -586,4 +609,16 @@ window.submitQuiz = function() {
             <button type="button" onclick="window.location.reload()" style="padding: 12px 25px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Làm bài mới</button>
         </div>
     `;
+};
+
+window.backToHome = function() {
+    if (confirm("Bạn có chắc muốn thoát ra màn hình chính? Bài làm hiện tại sẽ không được lưu.")) {
+        if (typeof AppState !== 'undefined' && AppState.timerInterval) {
+            clearInterval(AppState.timerInterval);
+        }
+        document.getElementById('quiz-screen').style.display = 'none';
+        document.getElementById('start-screen').style.display = 'block';
+        const resContainer = document.getElementById('result-container');
+        if (resContainer) resContainer.remove();
+    }
 };
