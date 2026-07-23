@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã khôi phục tính năng đọc tiếng Anh & hỗ trợ tự luận)
+// FILE: script.js (Đã cấu hình lại số câu/thời gian theo môn, ngẫu nhiên & xáo trộn đáp án)
 // ==========================================
 
 const AppState = {
@@ -13,6 +13,15 @@ const AppState = {
     wrongQuestions: [],
     isReadingComp: false
 };
+
+function shuffleArray(array) {
+    let arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
 
 function cleanOptionText(text) {
     if (!text) return '';
@@ -190,10 +199,8 @@ window.speakQuestion = function(index) {
 
     let textToRead = '';
     if (isVietAnh) {
-        // Việt - Anh: đọc từ tiếng Anh cần điền vào (đáp án đúng)
         textToRead = item.correct;
     } else {
-        // Anh - Việt: đọc câu hỏi/từ tiếng Anh
         textToRead = item.question;
     }
 
@@ -436,6 +443,7 @@ window.startQuiz = function() {
     const selectedMade = document.getElementById('made-select') ? document.getElementById('made-select').value.trim() : '';
     let rawSelectedQuestions = [];
     let totalSeconds = 10 * 60;
+    const cleanM = standardizeSubject(mon);
 
     if (selectedMade) {
         rawSelectedQuestions = AppState.allQuizData.filter(i => cleanKey(i.mon) === cleanKey(mon) && String(i.made).trim() === selectedMade && i.question !== '');
@@ -444,6 +452,24 @@ window.startQuiz = function() {
         const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
         rawSelectedQuestions = AppState.allQuizData.filter(i => cleanKey(i.mon) === cleanKey(mon) && selectedTopics.includes(i.chuDe) && i.question !== '');
+
+        // Chọn ngẫu nhiên câu hỏi
+        rawSelectedQuestions = shuffleArray(rawSelectedQuestions);
+
+        let targetCount = 10;
+        if (cleanM === 'Tiếng Anh') {
+            targetCount = 20;
+            totalSeconds = 10 * 60; // 10 phút
+        } else if (cleanM === 'Toán') {
+            targetCount = 10;
+            totalSeconds = 20 * 60; // 20 phút
+        } else {
+            totalSeconds = 10 * 60;
+        }
+
+        if (rawSelectedQuestions.length > targetCount) {
+            rawSelectedQuestions = rawSelectedQuestions.slice(0, targetCount);
+        }
     }
 
     if (rawSelectedQuestions.length === 0) return alert("Không tìm thấy câu hỏi phù hợp!");
@@ -451,6 +477,8 @@ window.startQuiz = function() {
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
+        // Xáo trộn đáp án trắc nghiệm
+        validKeys = shuffleArray(validKeys);
         return { ...item, _shuffledKeys: validKeys, _correctKey: originalCorrectKey };
     });
 
@@ -533,7 +561,6 @@ window.renderQuiz = function() {
         let bodyHtml = '';
 
         if (keysToRender.length === 0) {
-            // Dạng câu hỏi tự luận / điền từ vựng
             bodyHtml = `
                 <div style="margin-top: 12px;">
                     <input type="text" id="input-answer-${index}" placeholder="Nhập đáp án của bạn..." style="margin-bottom: 8px;" onkeydown="if(event.key==='Enter') window.submitTextAnswer(${index})">
@@ -541,7 +568,6 @@ window.renderQuiz = function() {
                 </div>
             `;
         } else {
-            // Dạng trắc nghiệm thông thường
             bodyHtml = keysToRender.map((optKey, displayIndex) => {
                 if (!item[optKey]) return '';
                 let displayLetter = String.fromCharCode(65 + displayIndex);
