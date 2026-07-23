@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: script.js (Đã hỗ trợ cả câu hỏi trắc nghiệm lẫn tự luận nhập chữ)
+// FILE: script.js (Đã khôi phục tính năng đọc tiếng Anh & hỗ trợ tự luận)
 // ==========================================
 
 const AppState = {
@@ -38,7 +38,6 @@ function updateScoreDisplay() {
         .leaderboard-item { padding: 10px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
         .medal { font-size: 1.2em; margin-right: 10px; }
         .score-badge { background: #eef2f3; padding: 4px 12px; border-radius: 20px; font-weight: bold; color: #4f46e5; }
-        .time-text { font-size: 0.8em; color: #888; display: block; }
         
         .custom-quiz-header {
             position: sticky;
@@ -85,6 +84,21 @@ function updateScoreDisplay() {
             border-top: 1px solid #eee;
             padding-top: 8px;
         }
+
+        .speech-btn {
+            background: #ffc107;
+            border: none;
+            border-radius: 6px;
+            padding: 4px 10px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: bold;
+            color: #000;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .speech-btn:hover { background: #e0a800; }
 
         .passage-box { 
             background: #ffffff; 
@@ -166,6 +180,30 @@ function updateScoreDisplay() {
 if ('speechSynthesis' in window) {
     window.speechSynthesis.getVoices();
 }
+
+window.speakQuestion = function(index) {
+    const item = AppState.currentQuizData[index];
+    if (!item) return;
+
+    const chuDeLower = (item.chuDe || '').toLowerCase();
+    const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
+
+    let textToRead = '';
+    if (isVietAnh) {
+        // Việt - Anh: đọc từ tiếng Anh cần điền vào (đáp án đúng)
+        textToRead = item.correct;
+    } else {
+        // Anh - Việt: đọc câu hỏi/từ tiếng Anh
+        textToRead = item.question;
+    }
+
+    if (textToRead && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(textToRead);
+        utterance.lang = 'en-US';
+        window.speechSynthesis.speak(utterance);
+    }
+};
 
 function escapeHTML(str) {
     if (!str) return "";
@@ -495,7 +533,7 @@ window.renderQuiz = function() {
         let bodyHtml = '';
 
         if (keysToRender.length === 0) {
-            // Dạng câu hỏi tự luận / điền từ vựng (không có A, B, C, D)
+            // Dạng câu hỏi tự luận / điền từ vựng
             bodyHtml = `
                 <div style="margin-top: 12px;">
                     <input type="text" id="input-answer-${index}" placeholder="Nhập đáp án của bạn..." style="margin-bottom: 8px;" onkeydown="if(event.key==='Enter') window.submitTextAnswer(${index})">
@@ -518,7 +556,10 @@ window.renderQuiz = function() {
 
         html += `
             <div class="quiz-card" id="question-card-${index}">
-                <div style="font-weight: bold; margin-bottom: 8px; color: #540606;">Câu ${index + 1}:</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-weight: bold; color: #540606;">Câu ${index + 1}:</div>
+                    <button class="speech-btn" onclick="window.speakQuestion(${index})">🔊 Nghe</button>
+                </div>
                 <div style="margin-bottom: 12px; font-weight: 500; white-space: pre-line;">${escapeHTML(item.question)}</div>
                 ${bodyHtml}
                 <div class="explanation-box" id="explanation-${index}">
