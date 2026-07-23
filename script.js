@@ -174,7 +174,6 @@ window.toggleDarkMode = function() {
     if (btn) btn.innerHTML = isDark ? '☀️ Sáng' : '🌙 Tối';
 };
 
-// Hàm xử lý ẩn/hiện khung chọn Mã đề khi bấm Checkbox
 window.toggleMadeMode = function() {
     const checkbox = document.getElementById('toggle-made');
     const madeContainer = document.getElementById('made-container');
@@ -188,7 +187,7 @@ window.toggleMadeMode = function() {
     } else {
         madeContainer.style.display = 'none';
         if (madeSelect) madeSelect.value = '';
-        window.handleMadeChange(); // Reset lại giao diện và chủ đề
+        window.handleMadeChange();
     }
 };
 
@@ -197,7 +196,6 @@ window.handleSubjectChange = function() {
     const levelContainer = document.getElementById('level-container');
     if (levelContainer) levelContainer.style.display = (mon === 'Tiếng Anh') ? 'block' : 'none';
     
-    // Reset lại trạng thái chọn mã đề khi đổi môn
     const toggleMade = document.getElementById('toggle-made');
     const madeContainer = document.getElementById('made-container');
     const madeSelect = document.getElementById('made-select');
@@ -327,7 +325,7 @@ window.handleQuizData = function(data) {
         if (item.made) lastMade = item.made; else if (lastMade) item.made = lastMade;
         if (item.passage) lastPassage = item.passage; else if (lastPassage) item.passage = lastPassage;
         return item;
-    }).filter(item => item && item.question !== '' && item.mon !== '' && cleanKey(item.mon) !== 'id'); // Lọc bỏ dòng có môn là 'id'
+    }).filter(item => item && item.question !== '' && item.mon !== '' && cleanKey(item.mon) !== 'id');
 
     AppState.userPermissions = (data.permissions || []).map(p => ({
         maHS: String(p.maHS || p[0] || '').trim(),
@@ -339,7 +337,6 @@ window.handleQuizData = function(data) {
 
     const subjectSelect = document.getElementById('subject-select');
     if (subjectSelect) {
-        // Lọc bỏ hẳn chữ 'id' ra khỏi danh sách hiển thị
         const subjects = [...new Set(AppState.allQuizData.map(i => i.mon).filter(s => s && cleanKey(s) !== 'id'))];
         subjectSelect.innerHTML = `<option value="">-- Chọn môn --</option>` + subjects.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
     }
@@ -407,6 +404,9 @@ window.startQuiz = function() {
         } else if (cleanM === 'Toán') {
             targetCount = 10;
             totalSeconds = 20 * 60;
+        } else if (cleanM === 'Tiếng Việt') {
+            targetCount = 10;
+            totalSeconds = 15 * 60;
         }
 
         if (rawSelectedQuestions.length > targetCount) {
@@ -479,11 +479,15 @@ window.renderQuiz = function() {
             }).join('');
         }
 
+        // Kiểm tra nếu là môn Tiếng Việt thì không hiển thị nút Nghe
+        const isVietnamese = cleanKey(item.mon).includes('tiengviet') || cleanKey(item.mon).includes('tv');
+        let speechBtnHtml = isVietnamese ? '' : `<button type="button" class="speech-btn" onclick="window.speakQuestion(${index})">🔊 Nghe</button>`;
+
         html += `
             <div class="quiz-card" id="question-card-${index}">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <div style="font-weight: bold; color: #540606;">Câu ${index + 1}:</div>
-                    <button type="button" class="speech-btn" onclick="window.speakQuestion(${index})">🔊 Nghe</button>
+                    ${speechBtnHtml}
                 </div>
                 <div style="margin-bottom: 12px; font-weight: 500; white-space: pre-line;">${escapeHTML(item.question)}</div>
                 ${bodyHtml}
@@ -604,7 +608,7 @@ window.submitQuiz = function() {
 
     resultContainer.innerHTML = `
         <h2 style="text-align: center; color: #540606;">Kết Quả Bài Làm</h2>
-        <p style="font-size: 1.1em; text-align: center;">Số câu đúng: <b>${AppState.correctCount} / ${totalQuestions}</b></p>
+        <p style="font-size: 1.1em; text-align: center;">Số câu hỏi đúng: <b>${AppState.correctCount} / ${totalQuestions}</b></p>
         <p style="font-size: 1.3em; text-align: center; color: #28a745; font-weight: bold;">Điểm số: ${score} đ</p>
         <div style="text-align: center; margin-top: 20px;">
             <button type="button" onclick="window.location.reload()" style="padding: 12px 25px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Làm bài mới</button>
