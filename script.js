@@ -406,23 +406,49 @@ window.handleQuizData = function(data) {
     window.initInterface();
 };
 
-window.renderLeaderboard = function(subjectFilter = null) {
-    const list = document.getElementById('ranking-list');
-    if (!list) return;
-    let data = AppState.rankings;
-    if (subjectFilter && subjectFilter !== "-- Chọn môn --") {
-        data = data.filter(item => cleanKey(item.subject || item.mon || '') === cleanKey(subjectFilter));
+window.renderLeaderboard = function(subjectFilter) {
+    const listEl = document.getElementById('ranking-list');
+    if (!listEl) return;
+
+    let filtered = AppState.rankings;
+    if (subjectFilter && subjectFilter !== 'all') {
+        filtered = filtered.filter(item => String(item.subject).trim().toLowerCase() === String(subjectFilter).trim().toLowerCase());
     }
-    const qualifiedData = data.filter(item => item.score >= 8);
-    if (qualifiedData.length === 0) {
-        list.innerHTML = '<p style="color: #666;">Chưa có dữ liệu xếp hạng (&gt;= 8).</p>';
+
+    // Lọc điểm >= 8 và sắp xếp giảm dần theo điểm
+    filtered = filtered.filter(item => Number(item.score) >= 8)
+                       .sort((a, b) => Number(b.score) - Number(a.score));
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = '<p style="text-align: center; color: #666; padding: 10px;">Chưa có dữ liệu xếp hạng.</p>';
         return;
     }
-    const top3 = qualifiedData.sort((a, b) => b.score - a.score).slice(0, 3);
-    list.innerHTML = top3.map((item, index) => {
-        let medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : "🥉");
-        return '<div class="leaderboard-item"><div><span class="medal">' + medal + '</span> <b>' + escapeHTML(item.name) + '</b></div><span class="score-badge">' + item.score + ' đ</span></div>';
-    }).join('');
+
+    let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+    
+    filtered.forEach((item, index) => {
+        let medal = index === 0 ? '🥇' : (index === 1 ? '🥈' : (index === 2 ? '🥉' : (index + 1)));
+        
+        // Hiển thị thêm thông tin Môn học và Thời gian vào dòng của từng học sinh
+        html += `<div style="display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 10px 12px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.2em; font-weight: bold; min-width: 25px;">${medal}</span>
+                <div>
+                    <div style="font-weight: bold; color: #333;">${item.name}</div>
+                    <div style="font-size: 0.85em; color: #666; margin-top: 2px;">
+                        📚 Môn: <span style="color: #007bff; font-weight: 500;">${item.subject || 'N/A'}</span> &nbsp;|&nbsp; 
+                        ⏰ ${item.date || ''}
+                    </div>
+                </div>
+            </div>
+            <div style="background: #e3f2fd; color: #0d6efd; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 0.9em;">
+                ${item.score} đ
+            </div>
+        </div>`;
+    });
+    
+    html += '</div>';
+    listEl.innerHTML = html;
 };
 
 function getCorrectKeys(item) {
@@ -843,6 +869,23 @@ window.submitQuiz = function() {
     let totalQuestions = AppState.currentQuizData.length;
     let score = Math.round((AppState.correctCount / totalQuestions) * 10 * 10) / 10;
     
+    // Lấy thông tin học sinh và môn học để gửi lên Google Sheets
+    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
+    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+    const levelSelect = document.getElementById('level-select');
+    const level = levelSelect ? levelSelect.value : '';
+
+    // Gửi điểm tự động về Google Apps Script Web App
+    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec"; // Giữ nguyên URL hiện tại của bạn
+    if (maHS && mon) {
+        fetch(API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ maHS: maHS, mon: mon, score: score, level: level })
+        }).catch(err => console.log(err));
+    }
+
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'none';
 
