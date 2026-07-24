@@ -9,26 +9,31 @@ const AppState = {
     wrongQuestions: []
 };
 
-// Hàm xử lý khi tích/bỏ tích ô checkbox Mã đề sẵn có trên giao diện
+window.handleMadeChange = function() {
+    const madeSelect = document.getElementById('made-select');
+    const previewEl = document.getElementById('made-passage-preview');
+    if (!madeSelect || !previewEl) return;
+    
+    const selectedMade = madeSelect.value.trim();
+    if (!selectedMade) {
+        previewEl.innerHTML = '';
+        return;
+    }
+
+    const found = AppState.allQuizData.find(i => String(i.made).trim() === selectedMade && i.passage && i.passage.trim() !== '');
+    if (found) {
+        const subText = escapeHTML(found.passage.substring(0, 150));
+        previewEl.innerHTML = '<div style="background: #f8f9fa; border: 1px solid #540606; padding: 10px; border-radius: 6px; margin-top: 5px; font-size: 0.9em;"><b style="color: #540606;">📄 Xem trước đoạn văn:</b><br>' + subText + '...</div>';
+    } else {
+        previewEl.innerHTML = '';
+    }
+};
+
 window.toggleMadeMode = function() {
     const toggleMade = document.getElementById('toggle-made');
     if (!toggleMade) return;
 
     let madeContainer = document.getElementById('made-container');
-    if (!madeContainer) {
-        madeContainer = document.createElement('div');
-        madeContainer.id = 'made-container';
-        madeContainer.style.cssText = 'display: none; margin-bottom: 15px;';
-        madeContainer.innerHTML = `
-            <label style="font-weight: bold; display: block; margin-bottom: 5px;">Chọn mã đề (MADE):</label>
-            <select id="made-select">
-                <option value="">-- Chọn mã đề --</option>
-            </select>
-        `;
-        const parentBlock = toggleMade.closest('div') || toggleMade.parentNode;
-        if (parentBlock) parentBlock.after(madeContainer);
-    }
-
     const topicContainer = document.getElementById('topic-container');
     const topicWrapper = topicContainer ? topicContainer.previousElementSibling : null;
     const selectAllBtn = document.querySelector('button[onclick*="toggleAllTopics"]') || Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Chọn/Bỏ chọn tất cả'));
@@ -68,14 +73,14 @@ function updateScoreDisplay() {
 
 function getStoredWrongQuestions(maHS, mon) {
     try {
-        const data = localStorage.getItem(`wrong_q_${maHS}_${mon}`);
+        const data = localStorage.getItem('wrong_q_' + maHS + '_' + mon);
         return data ? JSON.parse(data) : [];
     } catch(e) { return []; }
 }
 
 function saveStoredWrongQuestions(maHS, mon, wrongs) {
     try {
-        localStorage.setItem(`wrong_q_${maHS}_${mon}`, JSON.stringify(wrongs));
+        localStorage.setItem('wrong_q_' + maHS + '_' + mon, JSON.stringify(wrongs));
     } catch(e) {}
 }
 
@@ -98,7 +103,7 @@ function saveStoredWrongQuestions(maHS, mon, wrongs) {
         #topic-container { width: 100%; background: #ffffff; border: 1px solid #540606; border-radius: 8px; padding: 12px 15px; margin: 8px 0 15px 0; box-sizing: border-box; min-height: 50px; max-height: 200px; overflow-y: auto; }
         body.dark-mode { background-color: #121212 !important; color: #e0e0e0; }
         body.dark-mode .container { background: #1e1e1e; color: #e0e0e0; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        body.dark-mode .quiz-card, body.dark-mode .passage-box, body.dark-mode .leaderboard-container { background: #2d2d2d; border-color: #777; color: #e0e0e0; }
+        body.dark-mode .quiz-card, body.dark-mode .passage-box { background: #2d2d2d; border-color: #777; color: #e0e0e0; }
         body.dark-mode .option-box { background: #3a3a3a; border-color: #666; color: #e0e0e0; }
         body.dark-mode .option-box:hover { background: #4a4a4a; border-color: #888; }
         body.dark-mode input[type="text"], body.dark-mode select { background: #2d2d2d; color: #e0e0e0; border-color: #777; }
@@ -154,7 +159,7 @@ window.speakQuestion = function(index) {
 };
 
 function escapeHTML(str) {
-    if (!str) return "";
+    if (!str) return '';
     return String(str).replace(/[&<>"']/g, function(m) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
     });
@@ -239,6 +244,20 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
 
+    if (startScreen && !document.getElementById('practice-wrong-btn')) {
+        const wrongBtn = document.createElement('button');
+        wrongBtn.id = 'practice-wrong-btn';
+        wrongBtn.type = 'button';
+        wrongBtn.innerHTML = '🔄 Luyện tập lại các câu đã làm sai';
+        wrongBtn.style.cssText = 'width: 100%; padding: 12px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; font-weight: bold;';
+        wrongBtn.onclick = window.startWrongQuiz;
+        
+        const startBtn = document.getElementById('start-btn');
+        if (startBtn) {
+            startBtn.parentNode.insertBefore(wrongBtn, startBtn.nextSibling);
+        }
+    }
+
     if (savedMa) {
         window.loadData();
     }
@@ -273,7 +292,7 @@ window.updateMadeList = function() {
         .map(i => String(i.made).trim())
     )].filter(Boolean);
 
-    madeSelect.innerHTML = `<option value="">-- Chọn mã đề --</option>` + mades.map(m => `<option value="${escapeHTML(m)}">Mã đề: ${escapeHTML(m)}</option>`).join('');
+    madeSelect.innerHTML = '<option value="">-- Chọn mã đề --</option>' + mades.map(m => '<option value="' + escapeHTML(m) + '">Mã đề: ' + escapeHTML(m) + '</option>').join('');
 };
 
 window.updateTopicList = function() {
@@ -300,14 +319,12 @@ window.updateTopicList = function() {
     const authorizedTopics = topics.filter(topic => allowed.includes(topic));
 
     if (authorizedTopics.length === 0) {
-        container.innerHTML = `<i style="color: #d9534f;">Bạn chưa được phân quyền chủ đề nào cho môn này.</i>`;
+        container.innerHTML = '<i style="color: #d9534f;">Bạn chưa được phân quyền chủ đề nào cho môn này.</i>';
         return;
     }
 
     container.innerHTML = authorizedTopics.map(topic => {
-        return `<label style="display:block; margin:5px 0;">
-            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" checked> ${escapeHTML(topic)}
-        </label>`;
+        return '<label style="display:block; margin:5px 0;"><input type="checkbox" name="topic" value="' + escapeHTML(topic) + '" checked> ' + escapeHTML(topic) + '</label>';
     }).join('');
 };
 
@@ -322,7 +339,7 @@ window.initInterface = function() {
     const subjectSelect = document.getElementById('subject-select');
     if (subjectSelect) {
         const subjects = [...new Set(AppState.allQuizData.map(i => i.mon).filter(s => s && cleanKey(s) !== 'id'))];
-        subjectSelect.innerHTML = `<option value="">-- Chọn môn --</option>` + subjects.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
+        subjectSelect.innerHTML = '<option value="">-- Chọn môn --</option>' + subjects.map(s => '<option value="' + escapeHTML(s) + '">' + escapeHTML(s) + '</option>').join('');
     }
     window.renderLeaderboard();
     window.updateTopicList();
@@ -339,7 +356,7 @@ window.loadData = function() {
 
     const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
     const script = document.createElement('script');
-    script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
+    script.src = API_URL + '?ma=' + encodeURIComponent(maHS) + '&callback=handleQuizData';
     script.onerror = () => { 
         script.remove(); 
         if (container) container.innerHTML = "Lỗi kết nối mạng khi tải dữ liệu."; 
@@ -398,13 +415,13 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
     const qualifiedData = data.filter(item => item.score >= 8);
     if (qualifiedData.length === 0) {
-        list.innerHTML = `<p style="color: #666;">Chưa có dữ liệu xếp hạng (>= 8).</p>`;
+        list.innerHTML = '<p style="color: #666;">Chưa có dữ liệu xếp hạng (&gt;= 8).</p>';
         return;
     }
     const top3 = qualifiedData.sort((a, b) => b.score - a.score).slice(0, 3);
     list.innerHTML = top3.map((item, index) => {
         let medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : "🥉");
-        return `<div class="leaderboard-item"><div><span class="medal">${medal}</span> <b>${escapeHTML(item.name)}</b></div><span class="score-badge">${item.score} đ</span></div>`;
+        return '<div class="leaderboard-item"><div><span class="medal">' + medal + '</span> <b>' + escapeHTML(item.name) + '</b></div><span class="score-badge">' + item.score + ' đ</span></div>';
     }).join('');
 };
 
@@ -556,6 +573,49 @@ window.startQuiz = function() {
     window.startTimerTotal(totalSeconds);
 };
 
+window.startWrongQuiz = function() {
+    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+    if (!mon) return alert("Vui lòng chọn môn học để ôn tập câu sai!");
+
+    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
+    let storedWrongs = getStoredWrongQuestions(maHS, mon);
+
+    if (storedWrongs.length === 0) {
+        return alert("Tuyệt vời! Bạn chưa có câu hỏi sai nào cần luyện tập lại trong môn này.");
+    }
+
+    let rawSelectedQuestions = AppState.allQuizData.filter(i => 
+        cleanKey(i.mon) === cleanKey(mon) && 
+        storedWrongs.some(w => w.question === i.question) && 
+        i.question !== ''
+    );
+
+    if (rawSelectedQuestions.length === 0) {
+        return alert("Không tìm thấy dữ liệu câu sai tương ứng trong hệ thống!");
+    }
+
+    AppState.currentQuizData = rawSelectedQuestions.map(item => {
+        let originalCorrectKey = getOriginalCorrectKey(item);
+        let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
+        validKeys = shuffleArray(validKeys);
+
+        return { ...item, _shuffledKeys: validKeys, _correctKey: originalCorrectKey };
+    });
+
+    AppState.correctCount = 0;
+    AppState.wrongCount = 0;
+
+    const startScreen = document.getElementById('start-screen');
+    if (startScreen) startScreen.style.display = 'none';
+
+    const quizScreen = document.getElementById('quiz-screen');
+    if (quizScreen) quizScreen.style.display = 'block';
+
+    updateScoreDisplay();
+    window.renderQuiz();
+    window.startTimerTotal(10 * 60);
+};
+
 window.renderQuiz = function() {
     const container = document.getElementById('quiz');
     if (!container) return;
@@ -567,12 +627,7 @@ window.renderQuiz = function() {
         let passage = item.passage;
         if (passage && passage.trim() !== '' && !renderedPassages.has(passage)) {
             renderedPassages.add(passage);
-            html += `
-                <div class="passage-box">
-                    <div class="passage-tag">Đoạn văn đọc hiểu</div>
-                    <div style="white-space: pre-line; margin-top: 10px;">${escapeHTML(passage)}</div>
-                </div>
-            `;
+            html += '<div class="passage-box"><div class="passage-tag">Đoạn văn đọc hiểu</div><div style="white-space: pre-line; margin-top: 10px;">' + escapeHTML(passage) + '</div></div>';
         }
 
         let hasOptions = item.a || item.b || item.c || item.d;
@@ -584,37 +639,18 @@ window.renderQuiz = function() {
                 if (!item[optKey]) return '';
                 let displayLetter = String.fromCharCode(65 + displayIndex);
                 let cleanText = cleanOptionText(item[optKey]);
-                return `
-                    <div class="option-box" onclick="window.selectAnswer(${index}, '${optKey}')" id="q${index}-opt-${optKey}">
-                        <b>${displayLetter}.</b> ${escapeHTML(cleanText)}
-                    </div>
-                `;
+                return '<div class="option-box" onclick="window.selectAnswer(' + index + ', \'' + optKey + '\')" id="q' + index + '-opt-' + optKey + '"><b>' + displayLetter + '.</b> ' + escapeHTML(cleanText) + '</div>';
             }).join('');
         } else {
-            bodyHtml = `
-                <div style="margin-top: 10px;">
-                    <input type="text" id="text-input-${index}" placeholder="Nhập đáp án...">
-                    <button type="button" onclick="window.submitTextAnswer(${index})" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; display: inline-block;">Gửi đáp án</button>
-                </div>
-            `;
+            bodyHtml = '<div style="margin-top: 10px;"><input type="text" id="text-input-' + index + '" placeholder="Nhập đáp án..."><button type="button" onclick="window.submitTextAnswer(' + index + ')" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; display: inline-block;">Gửi đáp án</button></div>';
         }
 
-        const isVietnamese = cleanKey(item.mon).includes('tiengviet') || cleanKey(item.mon).includes('tv');
-        let speechBtnHtml = isVietnamese ? '' : `<button type="button" class="speech-btn" onclick="window.speakQuestion(${index})">🔊 Nghe</button>`;
+        // TẮT CHỨC NĂNG ÂM THANH CHO TOÁN VÀ TIẾNG VIỆT (Chỉ bật nút nghe cho Tiếng Anh)
+        const cleanMon = cleanKey(item.mon);
+        const isMathOrVietnamese = cleanMon.includes('toan') || cleanMon.includes('math') || cleanMon.includes('tiengviet') || cleanMon.includes('tv');
+        let speechBtnHtml = isMathOrVietnamese ? '' : '<button type="button" class="speech-btn" onclick="window.speakQuestion(' + index + ')">🔊 Nghe</button>';
 
-        html += `
-            <div class="quiz-card" id="question-card-${index}">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div style="font-weight: bold; color: #540606;">Câu ${index + 1}:</div>
-                    ${speechBtnHtml}
-                </div>
-                <div style="margin-bottom: 12px; font-weight: 500; white-space: pre-line;">${escapeHTML(item.question)}</div>
-                ${bodyHtml}
-                <div class="explanation-box" id="explanation-${index}">
-                    <b>💡 Giải thích:</b> ${escapeHTML(item.explanation || 'Không có giải thích.')}
-                </div>
-            </div>
-        `;
+        html += '<div class="quiz-card" id="question-card-' + index + '"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"><div style="font-weight: bold; color: #540606;">Câu ' + (index + 1) + ':</div>' + speechBtnHtml + '</div><div style="margin-bottom: 12px; font-weight: 500; white-space: pre-line;">' + escapeHTML(item.question) + '</div>' + bodyHtml + '<div class="explanation-box" id="explanation-' + index + '"><b>💡 Giải thích:</b> ' + escapeHTML(item.explanation || 'Không có giải thích.') + '</div></div>';
     });
 
     container.innerHTML = html;
@@ -634,15 +670,15 @@ window.selectAnswer = function(index, optKey) {
 
     if (isCorrect) {
         AppState.correctCount++;
-        const box = document.getElementById(`q${index}-opt-${optKey}`);
+        const box = document.getElementById('q' + index + '-opt-' + optKey);
         if (box) { box.style.background = '#d4edda'; box.style.borderColor = '#28a745'; }
         storedWrongs = storedWrongs.filter(w => w.question !== item.question);
     } else {
         AppState.wrongCount++;
-        const wrongBox = document.getElementById(`q${index}-opt-${optKey}`);
+        const wrongBox = document.getElementById('q' + index + '-opt-' + optKey);
         if (wrongBox) { wrongBox.style.background = '#f8d7da'; wrongBox.style.borderColor = '#dc3545'; }
         if (correctKey) {
-            const correctBox = document.getElementById(`q${index}-opt-${correctKey}`);
+            const correctBox = document.getElementById('q' + index + '-opt-' + correctKey);
             if (correctBox) { correctBox.style.background = '#d4edda'; correctBox.style.borderColor = '#28a745'; }
         }
         if (!storedWrongs.some(w => w.question === item.question)) {
@@ -653,11 +689,11 @@ window.selectAnswer = function(index, optKey) {
     updateScoreDisplay();
 
     item._shuffledKeys.forEach(k => {
-        const el = document.getElementById(`q${index}-opt-${k}`);
+        const el = document.getElementById('q' + index + '-opt-' + k);
         if (el) el.style.pointerEvents = 'none';
     });
 
-    const expBox = document.getElementById(`explanation-${index}`);
+    const expBox = document.getElementById('explanation-' + index);
     if (expBox) expBox.style.display = 'block';
 };
 
@@ -665,7 +701,7 @@ window.submitTextAnswer = function(index) {
     const item = AppState.currentQuizData[index];
     if (item._isAnswered) return;
 
-    const inputEl = document.getElementById(`text-input-${index}`);
+    const inputEl = document.getElementById('text-input-' + index);
     if (!inputEl) return;
     const userVal = inputEl.value.trim();
     if (!userVal) return alert("Vui lòng nhập đáp án!");
@@ -699,9 +735,9 @@ window.submitTextAnswer = function(index) {
     const btn = inputEl.nextElementSibling;
     if (btn) btn.disabled = true;
 
-    const expBox = document.getElementById(`explanation-${index}`);
+    const expBox = document.getElementById('explanation-' + index);
     if (expBox) {
-        expBox.innerHTML = `<b>💡 Giải thích:</b> Đáp án đúng là: <b>${escapeHTML(correctVal)}</b>. ${escapeHTML(item.explanation || '')}`;
+        expBox.innerHTML = '<b>💡 Giải thích:</b> Đáp án đúng là: <b>' + escapeHTML(correctVal) + '</b>. ' + escapeHTML(item.explanation || '');
         expBox.style.display = 'block';
     }
 };
@@ -716,7 +752,7 @@ window.startTimerTotal = function(durationSeconds) {
         let minutes = Math.floor(remainingTime / 60);
         let seconds = remainingTime % 60;
         if (timerDisplay) {
-            timerDisplay.innerHTML = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+            timerDisplay.innerHTML = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
         }
         if (remainingTime <= 0) {
             clearInterval(AppState.timerInterval);
@@ -742,14 +778,57 @@ window.submitQuiz = function() {
         document.body.appendChild(resultContainer);
     }
 
-    resultContainer.innerHTML = `
-        <h2 style="text-align: center; color: #540606;">Kết Quả Bài Làm</h2>
-        <p style="font-size: 1.1em; text-align: center;">Số câu hỏi đúng: <b>${AppState.correctCount} / ${totalQuestions}</b></p>
-        <p style="font-size: 1.3em; text-align: center; color: #28a745; font-weight: bold;">Điểm số: ${score} đ</p>
-        <div style="text-align: center; margin-top: 20px;">
-            <button type="button" onclick="window.location.reload()" style="padding: 12px 25px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Làm bài mới</button>
-        </div>
-    `;
+    resultContainer.innerHTML = '<h2 style="text-align: center; color: #540606;">Kết Quả Bài Làm</h2>' +
+        '<p style="font-size: 1.1em; text-align: center;">Số câu hỏi đúng: <b>' + AppState.correctCount + ' / ' + totalQuestions + '</b></p>' +
+        '<p style="font-size: 1.3em; text-align: center; color: #28a745; font-weight: bold;">Điểm số: ' + score + ' đ</p>' +
+        '<div style="display: flex; gap: 10px; margin-top: 20px;">' +
+        '<button type="button" onclick="window.location.reload()" style="flex: 1; padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Làm bài mới</button>' +
+        '<button type="button" onclick="window.viewReviewDetails()" style="flex: 1; padding: 12px; background: #6c757d; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🔍 Xem lại đề đã làm</button>' +
+        '</div>' +
+        '<div id="review-detail-box" style="margin-top: 20px;"></div>';
+};
+
+window.viewReviewDetails = function() {
+    const box = document.getElementById('review-detail-box');
+    if (!box) return;
+
+    let html = '<h3 style="color: #540606; border-bottom: 2px solid #540606; padding-bottom: 5px;">Chi Tiết Bài Làm</h3>';
+
+    AppState.currentQuizData.forEach((item, index) => {
+        let hasOptions = item.a || item.b || item.c || item.d;
+        let userAnswerText = 'Chưa trả lời';
+        let correctAnswerText = '';
+        let isCorrect = false;
+
+        if (hasOptions) {
+            let correctKey = item._correctKey;
+            correctAnswerText = correctKey ? correctKey.toUpperCase() + '. ' + cleanOptionText(item[correctKey]) : item.correct;
+            
+            if (item._userAnswer) {
+                let userKey = item._userAnswer;
+                userAnswerText = userKey.toUpperCase() + '. ' + cleanOptionText(item[userKey]);
+                isCorrect = (userKey.toLowerCase() === correctKey.toLowerCase());
+            }
+        } else {
+            correctAnswerText = item.correct;
+            if (item._userAnswer) {
+                userAnswerText = item._userAnswer;
+                isCorrect = (cleanKey(userAnswerText) === cleanKey(correctAnswerText));
+            }
+        }
+
+        let statusColor = isCorrect ? 'green' : 'red';
+        let statusText = isCorrect ? '✅ Đúng' : '❌ Sai';
+
+        html += '<div style="background: #fff; border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 10px;">' +
+            '<div style="font-weight: bold; margin-bottom: 5px;">Câu ' + (index + 1) + ': ' + escapeHTML(item.question) + '</div>' +
+            '<div style="font-size: 0.95em; color: ' + statusColor + '; font-weight: bold; margin-bottom: 4px;">Trạng thái: ' + statusText + '</div>' +
+            '<div style="font-size: 0.95em;">Bạn chọn: <b>' + escapeHTML(userAnswerText) + '</b></div>' +
+            '<div style="font-size: 0.95em; color: #28a745;">Đáp án đúng: <b>' + escapeHTML(correctAnswerText) + '</b></div>' +
+            '</div>';
+    });
+
+    box.innerHTML = html;
 };
 
 window.backToHome = function() {
