@@ -425,15 +425,24 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }).join('');
 };
 
-function getOriginalCorrectKey(item) {
+function getCorrectKeys(item) {
     const raw = String(item.correct || '').trim();
-    if (!raw) return '';
-    const upper = raw.toUpperCase();
-    if (['A', 'B', 'C', 'D'].includes(upper)) return upper.toLowerCase();
-    for (let key of ['a', 'b', 'c', 'd']) {
-        if (item[key] && cleanOptionText(String(item[key])).toLowerCase() === cleanOptionText(raw).toLowerCase()) return key;
+    if (!raw) return [];
+    let parts = raw.split(/[\s,;]+/);
+    let keys = [];
+    for (let p of parts) {
+        let upper = p.toUpperCase();
+        if (['A', 'B', 'C', 'D'].includes(upper)) {
+            keys.push(upper.toLowerCase());
+        } else {
+            for (let k of ['a', 'b', 'c', 'd']) {
+                if (item[k] && cleanOptionText(String(item[k])).toLowerCase() === cleanOptionText(p).toLowerCase()) {
+                    keys.push(k);
+                }
+            }
+        }
     }
-    return raw;
+    return [...new Set(keys)];
 }
 
 window.startQuiz = function() {
@@ -552,11 +561,11 @@ window.startQuiz = function() {
     if (rawSelectedQuestions.length === 0) return alert("Không tìm thấy câu hỏi phù hợp!");
 
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
-        let originalCorrectKey = getOriginalCorrectKey(item);
+        let correctKeys = getCorrectKeys(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
         validKeys = shuffleArray(validKeys);
 
-        return { ...item, _shuffledKeys: validKeys, _correctKey: originalCorrectKey };
+        return { ...item, _shuffledKeys: validKeys, _correctKeys: correctKeys };
     });
 
     AppState.correctCount = 0;
@@ -595,11 +604,11 @@ window.startWrongQuiz = function() {
     }
 
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
-        let originalCorrectKey = getOriginalCorrectKey(item);
+        let correctKeys = getCorrectKeys(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
         validKeys = shuffleArray(validKeys);
 
-        return { ...item, _shuffledKeys: validKeys, _correctKey: originalCorrectKey };
+        return { ...item, _shuffledKeys: validKeys, _correctKeys: correctKeys };
     });
 
     AppState.correctCount = 0;
@@ -632,6 +641,8 @@ window.renderQuiz = function() {
 
         let hasOptions = item.a || item.b || item.c || item.d;
         let bodyHtml = '';
+        let correctKeys = item._correctKeys || [];
+        let isMultiChoice = correctKeys.length > 1;
 
         if (hasOptions) {
             let keysToRender = item._shuffledKeys || ['a', 'b', 'c', 'd'].filter(k => item[k]);
@@ -639,13 +650,23 @@ window.renderQuiz = function() {
                 if (!item[optKey]) return '';
                 let displayLetter = String.fromCharCode(65 + displayIndex);
                 let cleanText = cleanOptionText(item[optKey]);
-                return '<div class="option-box" onclick="window.selectAnswer(' + index + ', \'' + optKey + '\')" id="q' + index + '-opt-' + optKey + '"><b>' + displayLetter + '.</b> ' + escapeHTML(cleanText) + '</div>';
+                
+                if (isMultiChoice) {
+                    return '<label class="option-box" style="display: block; cursor: pointer;" id="q' + index + '-opt-' + optKey + '">' +
+                           '<input type="checkbox" name="multi-q' + index + '" value="' + optKey + '" style="margin-right: 8px; width: 16px; height: 16px; cursor: pointer;">' +
+                           '<b>' + displayLetter + '.</b> ' + escapeHTML(cleanText) + '</label>';
+                } else {
+                    return '<div class="option-box" onclick="window.selectAnswer(' + index + ', \'' + optKey + '\')" id="q' + index + '-opt-' + optKey + '"><b>' + displayLetter + '.</b> ' + escapeHTML(cleanText) + '</div>';
+                }
             }).join('');
+
+            if (isMultiChoice) {
+                bodyHtml += '<button type="button" onclick="window.submitMultiAnswer(' + index + ')" id="multi-btn-' + index + '" style="margin-top: 10px; background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer;">Xác nhận đáp án</button>';
+            }
         } else {
             bodyHtml = '<div style="margin-top: 10px;"><input type="text" id="text-input-' + index + '" placeholder="Nhập đáp án..."><button type="button" onclick="window.submitTextAnswer(' + index + ')" style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; display: inline-block;">Gửi đáp án</button></div>';
         }
 
-        // TẮT CHỨC NĂNG ÂM THANH CHO TOÁN VÀ TIẾNG VIỆT (Chỉ bật nút nghe cho Tiếng Anh)
         const cleanMon = cleanKey(item.mon);
         const isMathOrVietnamese = cleanMon.includes('toan') || cleanMon.includes('math') || cleanMon.includes('tiengviet') || cleanMon.includes('tv');
         let speechBtnHtml = isMathOrVietnamese ? '' : '<button type="button" class="speech-btn" onclick="window.speakQuestion(' + index + ')">🔊 Nghe</button>';
@@ -660,9 +681,10 @@ window.selectAnswer = function(index, optKey) {
     const item = AppState.currentQuizData[index];
     if (item._isAnswered) return;
     item._isAnswered = true;
-    item._userAnswer = optKey;
+    item._userAnswer = [optKey];
 
-    let correctKey = item._correctKey;
+    let correctKeys = item._correctKeys || [];
+    let correctKey = correctKeys[0] || '';
     let isCorrect = (optKey.toLowerCase() === correctKey.toLowerCase());
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
@@ -697,6 +719,60 @@ window.selectAnswer = function(index, optKey) {
     if (expBox) expBox.style.display = 'block';
 };
 
+window.submitMultiAnswer = function(index) {
+    const item = AppState.currentQuizData[index];
+    if (item._isAnswered) return;
+
+    const checkboxes = document.querySelectorAll('input[name="multi-q' + index + '"]');
+    let userSelected = [];
+    checkboxes.forEach(cb => {
+        if (cb.checked) userSelected.push(cb.value);
+    });
+
+    if (userSelected.length === 0) {
+        return alert("Vui lòng chọn ít nhất một đáp án!");
+    }
+
+    item._isAnswered = true;
+    item._userAnswer = userSelected;
+
+    let correctKeys = item._correctKeys || [];
+    let isCorrect = userSelected.length === correctKeys.length && userSelected.every(k => correctKeys.includes(k));
+
+    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
+    let storedWrongs = getStoredWrongQuestions(maHS, item.mon);
+
+    item._shuffledKeys.forEach(k => {
+        const box = document.getElementById('q' + index + '-opt-' + k);
+        const cb = box ? box.querySelector('input') : null;
+        if (cb) cb.disabled = true;
+
+        if (correctKeys.includes(k)) {
+            if (box) { box.style.background = '#d4edda'; box.style.borderColor = '#28a745'; }
+        } else if (userSelected.includes(k)) {
+            if (box) { box.style.background = '#f8d7da'; box.style.borderColor = '#dc3545'; }
+        }
+    });
+
+    const submitBtn = document.getElementById('multi-btn-' + index);
+    if (submitBtn) submitBtn.disabled = true;
+
+    if (isCorrect) {
+        AppState.correctCount++;
+        storedWrongs = storedWrongs.filter(w => w.question !== item.question);
+    } else {
+        AppState.wrongCount++;
+        if (!storedWrongs.some(w => w.question === item.question)) {
+            storedWrongs.push({ question: item.question, chuDe: item.chuDe });
+        }
+    }
+    saveStoredWrongQuestions(maHS, item.mon, storedWrongs);
+    updateScoreDisplay();
+
+    const expBox = document.getElementById('explanation-' + index);
+    if (expBox) expBox.style.display = 'block';
+};
+
 window.submitTextAnswer = function(index) {
     const item = AppState.currentQuizData[index];
     if (item._isAnswered) return;
@@ -707,7 +783,7 @@ window.submitTextAnswer = function(index) {
     if (!userVal) return alert("Vui lòng nhập đáp án!");
 
     item._isAnswered = true;
-    item._userAnswer = userVal;
+    item._userAnswer = [userVal];
 
     let correctVal = String(item.correct || '').trim();
     let isCorrect = cleanKey(userVal) === cleanKey(correctVal);
@@ -799,20 +875,30 @@ window.viewReviewDetails = function() {
         let userAnswerText = 'Chưa trả lời';
         let correctAnswerText = '';
         let isCorrect = false;
+        let correctKeys = item._correctKeys || [];
+        let isMultiChoice = correctKeys.length > 1;
 
         if (hasOptions) {
-            let correctKey = item._correctKey;
-            correctAnswerText = correctKey ? correctKey.toUpperCase() + '. ' + cleanOptionText(item[correctKey]) : item.correct;
-            
-            if (item._userAnswer) {
-                let userKey = item._userAnswer;
-                userAnswerText = userKey.toUpperCase() + '. ' + cleanOptionText(item[userKey]);
-                isCorrect = (userKey.toLowerCase() === correctKey.toLowerCase());
+            if (isMultiChoice) {
+                correctAnswerText = correctKeys.map(k => k.toUpperCase() + '. ' + cleanOptionText(item[k])).join('; ');
+                if (Array.isArray(item._userAnswer) && item._userAnswer.length > 0) {
+                    userAnswerText = item._userAnswer.map(k => k.toUpperCase() + '. ' + cleanOptionText(item[k])).join('; ');
+                    isCorrect = item._userAnswer.length === correctKeys.length && item._userAnswer.every(k => correctKeys.includes(k));
+                }
+            } else {
+                let correctKey = correctKeys[0] || '';
+                correctAnswerText = correctKey ? correctKey.toUpperCase() + '. ' + cleanOptionText(item[correctKey]) : item.correct;
+                
+                if (item._userAnswer && item._userAnswer.length > 0) {
+                    let userKey = item._userAnswer[0];
+                    userAnswerText = userKey.toUpperCase() + '. ' + cleanOptionText(item[userKey]);
+                    isCorrect = (userKey.toLowerCase() === correctKey.toLowerCase());
+                }
             }
         } else {
             correctAnswerText = item.correct;
-            if (item._userAnswer) {
-                userAnswerText = item._userAnswer;
+            if (item._userAnswer && item._userAnswer.length > 0) {
+                userAnswerText = item._userAnswer[0];
                 isCorrect = (cleanKey(userAnswerText) === cleanKey(correctAnswerText));
             }
         }
