@@ -179,11 +179,6 @@ window.toggleMadeMode = function() {
     const madeContainer = document.getElementById('made-container');
     const madeSelect = document.getElementById('made-select');
     
-    // Tìm các phần tử hiển thị chọn chủ đề để ẩn/hiện
-    // Thường bao gồm label "Chọn chủ đề:", nút chọn tất cả, và hộp chứa chủ đề (#topic-container hoặc bao quanh nó)
-    const topicSectionLabels = document.querySelectorAll('label, div');
-    
-    // Tìm block chứa "Chọn chủ đề" bằng cách duyệt qua các phần tử trên giao diện
     const topicContainer = document.getElementById('topic-container');
     const topicHeaderLabel = Array.from(document.querySelectorAll('div, label')).find(el => el.textContent.trim().startsWith('Chọn chủ đề:'));
     const topicSelectAllBtn = document.querySelector('button[onclick*="toggleAllTopics"]') || document.getElementById('select-all-topics-btn');
@@ -192,9 +187,7 @@ window.toggleMadeMode = function() {
     
     if (checkbox.checked) {
         madeContainer.style.display = 'block';
-        // Ẩn phần chọn chủ đề
         if (topicContainer && topicContainer.parentElement) {
-            // Ẩn cả cụm chọn chủ đề nếu muốn, hoặc ẩn riêng từng thành phần
             if (topicHeaderLabel) topicHeaderLabel.style.display = 'none';
             if (topicSelectAllBtn) topicSelectAllBtn.style.display = 'none';
             topicContainer.style.display = 'none';
@@ -204,7 +197,6 @@ window.toggleMadeMode = function() {
         madeContainer.style.display = 'none';
         if (madeSelect) madeSelect.value = '';
         
-        // Hiện lại phần chọn chủ đề
         if (topicContainer) {
             if (topicHeaderLabel) topicHeaderLabel.style.display = '';
             if (topicSelectAllBtn) topicSelectAllBtn.style.display = '';
@@ -228,7 +220,6 @@ window.handleSubjectChange = function() {
     if (madeContainer) madeContainer.style.display = 'none';
     if (madeSelect) madeSelect.value = '';
 
-    // Đảm bảo phần chủ đề hiện lại khi đổi môn nếu chưa bật mã đề
     const topicContainer = document.getElementById('topic-container');
     const topicHeaderLabel = Array.from(document.querySelectorAll('div, label')).find(el => el.textContent.trim().startsWith('Chọn chủ đề:'));
     const topicSelectAllBtn = document.querySelector('button[onclick*="toggleAllTopics"]');
@@ -265,6 +256,7 @@ window.handleMadeChange = function() {
     const toggleMade = document.getElementById('toggle-made');
     const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
     const previewDiv = document.getElementById('made-passage-preview');
+    const monSelect = document.getElementById('subject-select') ? document.getElementById('subject-select').value.trim() : '';
     if (!previewDiv) return;
 
     if (!selectedMade) {
@@ -273,7 +265,9 @@ window.handleMadeChange = function() {
         return;
     }
 
-    const matchedItem = AppState.allQuizData.find(i => String(i.made).trim() === selectedMade && i.passage && i.passage.trim() !== '');
+    const cleanMon = cleanKey(monSelect);
+    // Đã bổ sung lọc chính xác theo môn học (cleanKey(i.mon) === cleanMon) để tránh lấy nhầm đoạn văn của môn khác
+    const matchedItem = AppState.allQuizData.find(i => cleanKey(i.mon) === cleanMon && String(i.made).trim() === selectedMade && i.passage && i.passage.trim() !== '');
     if (matchedItem) {
         previewDiv.innerHTML = `
             <div class="passage-box" style="margin-top: 10px; font-size: 0.95em;">
@@ -300,6 +294,7 @@ window.updateTopicList = function() {
     }
 
     const cleanMonSelect = cleanKey(monSelect);
+
     const allowed = AppState.userPermissions
         .filter(p => String(p.maHS).trim() === maHS && cleanKey(p.mon) === cleanMonSelect)
         .map(p => String(p.chuDe).trim());
@@ -312,11 +307,17 @@ window.updateTopicList = function() {
         container.innerHTML = "Không tìm thấy chủ đề cho môn này.";
         return;
     }
-    const hasSpecificPermissions = allowed.length > 0;
-    container.innerHTML = topics.map(topic => {
-        const isAllowed = !hasSpecificPermissions || allowed.includes(topic);
-        return `<label style="display:block; margin:5px 0; opacity:${isAllowed ? '1' : '0.5'}">
-            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" ${isAllowed ? 'checked' : ''}> ${escapeHTML(topic)}
+
+    const authorizedTopics = topics.filter(topic => allowed.includes(topic));
+
+    if (authorizedTopics.length === 0) {
+        container.innerHTML = `<i style="color: #d9534f;">Bạn chưa được phân quyền chủ đề nào cho môn này.</i>`;
+        return;
+    }
+
+    container.innerHTML = authorizedTopics.map(topic => {
+        return `<label style="display:block; margin:5px 0;">
+            <input type="checkbox" name="topic" value="${escapeHTML(topic)}" checked> ${escapeHTML(topic)}
         </label>`;
     }).join('');
 };
@@ -336,7 +337,7 @@ window.loadData = function() {
     const container = document.getElementById('topic-container');
     if (container) container.innerHTML = "Đang tải dữ liệu chủ đề...";
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
     const script = document.createElement('script');
     script.src = `${API_URL}?ma=${encodeURIComponent(maHS)}&callback=handleQuizData`;
     script.onerror = () => { script.remove(); if (container) container.innerHTML = "Lỗi kết nối tải dữ liệu."; };
@@ -351,13 +352,38 @@ window.handleQuizData = function(data) {
     AppState.allQuizData = (data.questions || []).map(rawItem => {
         let item = normalizeItem(rawItem);
         if (!item) return null;
-        if (item.mon) lastMon = item.mon; else item.mon = lastMon;
-        if (item.mon) item.mon = standardizeSubject(item.mon);
+
+        // Nếu đổi môn, reset hoàn toàn context cũ để tránh dính dữ liệu giữa các môn
+        if (item.mon) {
+            lastMon = standardizeSubject(item.mon);
+            lastChuDe = '';
+            lastLevel = '';
+            lastLoai = '';
+            lastPassage = '';
+            lastMade = '';
+        }
+        item.mon = lastMon;
+
+        // Nếu đổi mã đề (made), reset passage cũ để không bị dính đoạn văn của mã đề trước
+        if (item.made) {
+            if (item.made !== lastMade) {
+                lastPassage = '';
+            }
+            lastMade = item.made;
+        } else if (lastMade) {
+            item.made = lastMade;
+        }
+
         if (item.chuDe) lastChuDe = item.chuDe; else item.chuDe = lastChuDe;
         if (item.level) lastLevel = item.level; else if (lastLevel) item.level = lastLevel;
         if (item.loai) lastLoai = item.loai; else if (lastLoai) item.loai = lastLoai;
-        if (item.made) lastMade = item.made; else if (lastMade) item.made = lastMade;
-        if (item.passage) lastPassage = item.passage; else if (lastPassage) item.passage = lastPassage;
+
+        if (item.passage) {
+            lastPassage = item.passage;
+        } else if (lastPassage) {
+            item.passage = lastPassage;
+        }
+
         return item;
     }).filter(item => item && item.question !== '' && item.mon !== '' && cleanKey(item.mon) !== 'id');
 
