@@ -876,7 +876,7 @@ window.submitQuiz = function() {
     const level = levelSelect ? levelSelect.value : '';
 
     // Gửi điểm tự động về Google Apps Script Web App
-    const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec"; // Giữ nguyên URL hiện tại của bạn
+    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec"; // Giữ nguyên URL hiện tại của bạn
     if (maHS && mon) {
         fetch(API_URL, {
             method: 'POST',
