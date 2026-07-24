@@ -31,6 +31,20 @@ function updateScoreDisplay() {
     if (wrongEl) wrongEl.innerText = AppState.wrongCount;
 }
 
+// Quản lý lưu trữ câu hỏi làm sai theo học sinh và môn
+function getStoredWrongQuestions(maHS, mon) {
+    try {
+        const data = localStorage.getItem(`wrong_q_${maHS}_${mon}`);
+        return data ? JSON.parse(data) : [];
+    } catch(e) { return []; }
+}
+
+function saveStoredWrongQuestions(maHS, mon, wrongs) {
+    try {
+        localStorage.setItem(`wrong_q_${maHS}_${mon}`, JSON.stringify(wrongs));
+    } catch(e) {}
+}
+
 (function injectStyles() {
     const style = document.createElement('style');
     style.innerHTML = `
@@ -266,7 +280,6 @@ window.handleMadeChange = function() {
     }
 
     const cleanMon = cleanKey(monSelect);
-    // Đã bổ sung lọc chính xác theo môn học (cleanKey(i.mon) === cleanMon) để tránh lấy nhầm đoạn văn của môn khác
     const matchedItem = AppState.allQuizData.find(i => cleanKey(i.mon) === cleanMon && String(i.made).trim() === selectedMade && i.passage && i.passage.trim() !== '');
     if (matchedItem) {
         previewDiv.innerHTML = `
@@ -353,7 +366,6 @@ window.handleQuizData = function(data) {
         let item = normalizeItem(rawItem);
         if (!item) return null;
 
-        // Nếu đổi môn, reset hoàn toàn context cũ để tránh dính dữ liệu giữa các môn
         if (item.mon) {
             lastMon = standardizeSubject(item.mon);
             lastChuDe = '';
@@ -364,7 +376,6 @@ window.handleQuizData = function(data) {
         }
         item.mon = lastMon;
 
-        // Nếu đổi mã đề (made), reset passage cũ để không bị dính đoạn văn của mã đề trước
         if (item.made) {
             if (item.made !== lastMade) {
                 lastPassage = '';
@@ -440,6 +451,7 @@ window.startQuiz = function() {
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
+    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     const toggleMade = document.getElementById('toggle-made');
     const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
     
@@ -448,27 +460,53 @@ window.startQuiz = function() {
     const cleanM = standardizeSubject(mon);
 
     if (selectedMade) {
+        // Trường hợp 2: Mã đề (đặc biệt các mã bắt đầu bằng DH) - giữ nguyên thứ tự câu hỏi, không xáo trộn danh sách câu hỏi
         rawSelectedQuestions = AppState.allQuizData.filter(i => cleanKey(i.mon) === cleanKey(mon) && String(i.made).trim() === selectedMade && i.question !== '');
         totalSeconds = 45 * 60;
     } else {
         const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
-        rawSelectedQuestions = AppState.allQuizData.filter(i => cleanKey(i.mon) === cleanKey(mon) && selectedTopics.includes(i.chuDe) && i.question !== '');
 
-        rawSelectedQuestions = shuffleArray(rawSelectedQuestions);
+        // Kiểm tra xem có chọn chủ đề "Động từ bất quy tắc" hay không
+        const isIrregularVerbs = selectedTopics.some(t => cleanKey(t).includes('dongtubatquytac'));
+
+        // Trường hợp 3: Ưu tiên các câu hỏi làm sai trước
+        let storedWrongs = getStoredWrongQuestions(maHS, mon);
+        let wrongPool = AppState.allQuizData.filter(i => 
+            cleanKey(i.mon) === cleanKey(mon) && 
+            selectedTopics.includes(i.chuDe) && 
+            i.question !== '' &&
+            storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe)
+        );
+
+        let normalPool = AppState.allQuizData.filter(i => 
+            cleanKey(i.mon) === cleanKey(mon) && 
+            selectedTopics.includes(i.chuDe) && 
+            i.question !== '' &&
+            !wrongPool.some(w => w.question === i.question && w.chuDe === i.chuDe)
+        );
+        normalPool = shuffleArray(normalPool);
 
         let targetCount = 10;
-        if (cleanM === 'Tiếng Anh') {
-            targetCount = 20;
-            totalSeconds = 10 * 60;
-        } else if (cleanM === 'Toán') {
-            targetCount = 10;
-            totalSeconds = 20 * 60;
-        } else if (cleanM === 'Tiếng Việt') {
-            targetCount = 10;
-            totalSeconds = 15 * 60;
+        if (isIrregularVerbs) {
+            // Trường hợp 4: Động từ bất quy tắc lấy 5 từ và thời gian 5 phút
+            targetCount = 5;
+            totalSeconds = 5 * 60;
+        } else {
+            if (cleanM === 'Tiếng Anh') {
+                targetCount = 20;
+                totalSeconds = 10 * 60;
+            } else if (cleanM === 'Toán') {
+                targetCount = 10;
+                totalSeconds = 20 * 60;
+            } else if (cleanM === 'Tiếng Việt') {
+                targetCount = 10;
+                totalSeconds = 15 * 60;
+            }
         }
 
+        // Gộp câu sai lên đầu, sau đó đến câu bình thường ngẫu nhiên
+        rawSelectedQuestions = [...wrongPool, ...normalPool];
         if (rawSelectedQuestions.length > targetCount) {
             rawSelectedQuestions = rawSelectedQuestions.slice(0, targetCount);
         }
@@ -479,6 +517,7 @@ window.startQuiz = function() {
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let originalCorrectKey = getOriginalCorrectKey(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
+        // Trường hợp 1 & 2: Luôn xáo trộn ngẫu nhiên các đáp án A, B, C, D
         validKeys = shuffleArray(validKeys);
         return { ...item, _shuffledKeys: validKeys, _correctKey: originalCorrectKey };
     });
@@ -569,10 +608,16 @@ window.selectAnswer = function(index, optKey) {
     let correctKey = item._correctKey;
     let isCorrect = (optKey.toLowerCase() === correctKey.toLowerCase());
 
+    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
+    let storedWrongs = getStoredWrongQuestions(maHS, item.mon);
+
     if (isCorrect) {
         AppState.correctCount++;
         const box = document.getElementById(`q${index}-opt-${optKey}`);
         if (box) { box.style.background = '#d4edda'; box.style.borderColor = '#28a745'; }
+        
+        // Nếu làm đúng thì xóa khỏi danh sách câu sai
+        storedWrongs = storedWrongs.filter(w => w.question !== item.question);
     } else {
         AppState.wrongCount++;
         const wrongBox = document.getElementById(`q${index}-opt-${optKey}`);
@@ -581,7 +626,13 @@ window.selectAnswer = function(index, optKey) {
             const correctBox = document.getElementById(`q${index}-opt-${correctKey}`);
             if (correctBox) { correctBox.style.background = '#d4edda'; correctBox.style.borderColor = '#28a745'; }
         }
+
+        // Nếu làm sai thì thêm vào danh sách câu sai để các lần sau ưu tiên ôn lại
+        if (!storedWrongs.some(w => w.question === item.question)) {
+            storedWrongs.push({ question: item.question, chuDe: item.chuDe });
+        }
     }
+    saveStoredWrongQuestions(maHS, item.mon, storedWrongs);
 
     updateScoreDisplay();
 
@@ -609,15 +660,23 @@ window.submitTextAnswer = function(index) {
     let correctVal = String(item.correct || '').trim();
     let isCorrect = removeDiacritics(userVal).toLowerCase() === removeDiacritics(correctVal).toLowerCase();
 
+    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
+    let storedWrongs = getStoredWrongQuestions(maHS, item.mon);
+
     if (isCorrect) {
         AppState.correctCount++;
         inputEl.style.background = '#d4edda';
         inputEl.style.borderColor = '#28a745';
+        storedWrongs = storedWrongs.filter(w => w.question !== item.question);
     } else {
         AppState.wrongCount++;
         inputEl.style.background = '#f8d7da';
         inputEl.style.borderColor = '#dc3545';
+        if (!storedWrongs.some(w => w.question === item.question)) {
+            storedWrongs.push({ question: item.question, chuDe: item.chuDe });
+        }
     }
+    saveStoredWrongQuestions(maHS, item.mon, storedWrongs);
     inputEl.disabled = true;
 
     updateScoreDisplay();
