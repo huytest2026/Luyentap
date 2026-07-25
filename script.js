@@ -490,6 +490,7 @@ window.handleQuizData = function(data) {
     window.initInterface();
 };
 
+// CẬP NHẬT: Điều kiện Kim Cương (3 lần liên tiếp đạt 10 điểm nhưng không được trùng hoàn toàn một chủ đề)
 function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
@@ -502,8 +503,16 @@ function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
         let s1 = Number(studentAttempts[i].score);
         let s2 = Number(studentAttempts[i+1].score);
         let s3 = Number(studentAttempts[i+2].score);
+        
         if (s1 === 10 && s2 === 10 && s3 === 10) {
-            return true;
+            let t1 = cleanKey(studentAttempts[i].chuDe || studentAttempts[i].topic || '');
+            let t2 = cleanKey(studentAttempts[i+1].chuDe || studentAttempts[i+1].topic || '');
+            let t3 = cleanKey(studentAttempts[i+2].chuDe || studentAttempts[i+2].topic || '');
+            
+            // 3 lần liên tiếp đạt 10 điểm và các chủ đề không trùng y hệt nhau
+            if (!(t1 && t2 && t3 && t1 === t2 && t2 === t3)) {
+                return true;
+            }
         }
     }
     return false;
@@ -577,7 +586,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
 
     let html = '<div style="display: flex; flex-direction: column; gap: 5px;">';
-    html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm)', '#007bff', kimCuongList);
+    html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList);
     html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList);
     html += buildGroupHtml('🥈 Bạc (Có ít nhất 2 lần đạt 9 điểm trở lên)', '#6c757d', bacList);
     html += buildGroupHtml('🥉 Đồng (Có ít nhất 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList);
