@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbwABOWdjRcG_rX9tVXjrLDsXFRMEbgUfn01QC6U5Z91qwdwq5askg7CrQHEDjf8np-H/exec";
 
 let AppState = {
     allQuizData: [],
@@ -157,6 +157,18 @@ if ('speechSynthesis' in window) {
     window.speechSynthesis.getVoices();
 }
 
+// Lắng nghe sự kiện click chọn đáp án để nhận diện học sinh đã trả lời câu hỏi
+document.addEventListener('click', function(e) {
+    const optionBox = e.target.closest('.option-box');
+    if (optionBox) {
+        const quizCard = optionBox.closest('.quiz-card');
+        if (quizCard) {
+            quizCard.querySelectorAll('.option-box').forEach(b => b.classList.remove('selected-option'));
+            optionBox.classList.add('selected-option');
+        }
+    }
+});
+
 window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
@@ -165,6 +177,14 @@ window.speakQuestion = function(index) {
     const isIrregularVerbs = chuDeLower.includes('dongtubatquytac') || chuDeLower.includes('động từ bất quy tắc');
 
     let textToRead = '';
+    
+    // Kiểm tra xem học sinh đã chọn đáp án cho câu này chưa trên giao diện
+    let hasAnswered = false;
+    const quizCards = document.querySelectorAll('.quiz-card');
+    if (quizCards[index]) {
+        hasAnswered = quizCards[index].querySelector('.option-box.selected-option') !== null;
+    }
+
     if (isVietAnh) {
         textToRead = item.correct;
     } else if (isIrregularVerbs) {
@@ -184,10 +204,26 @@ window.speakQuestion = function(index) {
         }
     } else {
         textToRead = item.question;
+        
+        // Nếu ĐÃ chọn đáp án: tự động điền từ đúng vào chỗ trống
+        if (hasAnswered) {
+            let correctText = '';
+            const correctKeys = getCorrectKeys(item);
+            if (correctKeys.length > 0) {
+                correctText = cleanOptionText(item[correctKeys[0]]);
+            } else if (item.correct) {
+                correctText = cleanOptionText(item.correct);
+            }
+            
+            if (correctText) {
+                textToRead = textToRead.replace(/\.{3,}|_+/g, ' ' + correctText + ' ');
+            }
+        }
     }
 
-    if (textToRead) {
-        textToRead = textToRead.replace(/_+/g, ', ');
+    // Nếu CHƯA chọn đáp án: đọc với khoảng nghỉ (dấu phẩy)
+    if (!hasAnswered && textToRead) {
+        textToRead = textToRead.replace(/\.{3,}|_+/g, ', ');
     }
 
     if (textToRead && 'speechSynthesis' in window) {
@@ -403,7 +439,6 @@ window.loadData = function() {
     const container = document.getElementById('topic-container');
     if (container) container.innerHTML = "Đang tải dữ liệu...";
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
     const script = document.createElement('script');
     script.src = API_URL + '?ma=' + encodeURIComponent(maHS) + '&callback=handleQuizData';
     script.onerror = () => { 
@@ -455,7 +490,6 @@ window.handleQuizData = function(data) {
     window.initInterface();
 };
 
-// Hàm kiểm tra 3 lần thi liên tiếp đạt đúng 10 điểm (Xếp hạng Kim Cương)
 function hasThreeConsecutiveHighScores(rankings, studentName, subject) {
     let studentAttempts = rankings.filter(r => 
         String(r.name).trim().toLowerCase() === String(studentName).trim().toLowerCase() &&
@@ -492,55 +526,80 @@ window.renderLeaderboard = function(subjectFilter = null) {
         }
     });
 
-    let diamondRankings = [];
+    let kimCuongList = [];
+    let vangList = [];
+    let bacList = [];
+    let dongList = [];
+
     for (let key in studentSubjects) {
         let st = studentSubjects[key];
         if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
         
+        let attempts = AppState.rankings.filter(r => 
+            String(r.name).trim().toLowerCase() === st.name.toLowerCase() &&
+            cleanKey(r.subject || r.mon || '') === cleanKey(st.subject)
+        );
+        if (attempts.length === 0) continue;
+
+        let bestScore = Math.max(...attempts.map(a => Number(a.score)));
+        let latestAttempt = attempts[attempts.length - 1];
+
         if (hasThreeConsecutiveHighScores(AppState.rankings, st.name, st.subject)) {
-            let attempts = AppState.rankings.filter(r => 
-                String(r.name).trim().toLowerCase() === st.name.toLowerCase() &&
-                cleanKey(r.subject || r.mon || '') === cleanKey(st.subject)
-            );
-            let bestScore = Math.max(...attempts.map(a => Number(a.score)));
-            let latestAttempt = attempts[attempts.length - 1];
-            
-            diamondRankings.push({
-                name: st.name,
-                subject: st.subject,
-                score: bestScore,
-                date: latestAttempt.date || ''
-            });
+            kimCuongList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
+        } 
+        else if (attempts.some(a => Number(a.score) === 10)) {
+            vangList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
+        }
+        else if (attempts.filter(a => Number(a.score) >= 9).length >= 2) {
+            bacList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
+        }
+        else if (attempts.filter(a => Number(a.score) >= 8).length >= 2) {
+            dongList.push({ name: st.name, subject: st.subject, score: bestScore, date: latestAttempt.date || '' });
         }
     }
 
-    if (diamondRankings.length === 0) {
-        list.innerHTML = '<p style="color: #666; padding: 10px; text-align: center;">Chưa có học sinh đạt chuẩn Kim Cương (3 lần thi liên tiếp đạt 10 điểm).</p>';
-        return;
+    kimCuongList.sort((a, b) => b.score - a.score);
+    vangList.sort((a, b) => b.score - a.score);
+    bacList.sort((a, b) => b.score - a.score);
+    dongList.sort((a, b) => b.score - a.score);
+
+    function buildGroupHtml(title, color, listItems) {
+        if (listItems.length === 0) {
+            return `<div style="margin-bottom: 12px; font-size: 0.95em;"><b>${title}:</b> <span style="color: #888; font-style: italic;">Chưa có học sinh đạt chuẩn</span></div>`;
+        }
+        let itemsHtml = listItems.map(item => 
+            `<li style="margin: 4px 0;"><b>${escapeHTML(item.name)}</b> (Môn: <span style="color: #007bff; font-weight: 500;">${escapeHTML(item.subject)}</span> - Điểm cao nhất: ${item.score} đ)</li>`
+        ).join('');
+        return `<div style="margin-bottom: 15px;">
+                    <b style="color: ${color}; font-size: 1.05em;">${title}:</b>
+                    <ul style="margin: 5px 0 0 20px; padding: 0; font-size: 0.95em;">${itemsHtml}</ul>
+                </div>`;
     }
 
-    diamondRankings.sort((a, b) => b.score - a.score);
+    let html = '<div style="display: flex; flex-direction: column; gap: 5px;">';
+    html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm)', '#007bff', kimCuongList);
+    html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList);
+    html += buildGroupHtml('🥈 Bạc (Có ít nhất 2 lần đạt 9 điểm trở lên)', '#6c757d', bacList);
+    html += buildGroupHtml('🥉 Đồng (Có ít nhất 2 lần đạt 8 điểm trở lên)', '#cd7f32', dongList);
+    html += '</div>';
 
-    list.innerHTML = '<div style="display: flex; flex-direction: column; gap: 8px;">' + diamondRankings.map((item, index) => {
-        let medal = index === 0 ? "💎🥇" : (index === 1 ? "💎🥈" : (index === 2 ? "💎🥉" : "💎"));
-        return '<div style="display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 10px 12px; border-radius: 8px; border: 1px solid #540606;">' +
-            '<div style="display: flex; align-items: center; gap: 10px;">' +
-                '<span style="font-size: 1.2em; font-weight: bold; min-width: 35px;">' + medal + '</span>' +
-                '<div>' +
-                    '<div style="font-weight: bold; color: #540606;">' + escapeHTML(item.name) + ' <span style="font-size:0.8em; background:#e0f7fa; color:#006064; padding:2px 6px; border-radius:4px; font-weight:bold;">Kim Cương</span></div>' +
-                    '<div style="font-size: 0.85em; color: #666; margin-top: 2px;">📚 Môn: <span style="color: #007bff; font-weight: 500;">' + escapeHTML(item.subject || 'N/A') + '</span> &nbsp;|&nbsp; ⏰ ' + escapeHTML(item.date || '') + '</div>' +
-                '</div>' +
-            '</div>' +
-            '<div style="background: #e0f7fa; color: #006064; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 0.9em;">' + item.score + ' đ</div>' +
-        '</div>';
-    }).join('') + '</div>';
+    list.innerHTML = html;
 };
 
 function getCorrectKeys(item) {
     const raw = String(item.correct || '').trim();
     if (!raw) return [];
-    let parts = raw.split(/[\s,;]+/);
+    
     let keys = [];
+    
+    for (let k of ['a', 'b', 'c', 'd']) {
+        if (item[k] && cleanOptionText(String(item[k])).toLowerCase() === cleanOptionText(raw).toLowerCase()) {
+            keys.push(k);
+        }
+    }
+    if (keys.length > 0) return [...new Set(keys)];
+
+    let parts = raw.split(/[\s,;]+/);
     for (let p of parts) {
         let upper = p.toUpperCase();
         if (['A', 'B', 'C', 'D'].includes(upper)) {
@@ -566,7 +625,6 @@ window.startQuiz = function() {
     const selectedLevel = levelSelect ? levelSelect.value : '';
     const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
 
-    // Kiểm tra điều kiện Level 2, 3: Đối với mỗi chủ đề phải đạt 3 lần liên tiếp > 8 điểm ở Level 1
     if (selectedLevel === 'Level 2' || selectedLevel === 'Level 3' || selectedLevel === '2' || selectedLevel === '3' || selectedLevel.includes('2') || selectedLevel.includes('3')) {
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
 
@@ -584,7 +642,6 @@ window.startQuiz = function() {
                     let s1 = Number(topicAttempts[i].score);
                     let s2 = Number(topicAttempts[i+1].score);
                     let s3 = Number(topicAttempts[i+2].score);
-                    // Điều kiện: trên 8 điểm (>= 8.0)
                     if (s1 >= 8 && s2 >= 8 && s3 >= 8) {
                         hasThreeConsecutive = true;
                         break;
@@ -742,7 +799,6 @@ window.startQuiz = function() {
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'block';
 
-    // Bắt đầu kích hoạt cơ chế chặn thoát trang/tắt chương trình khi đang làm bài
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     updateScoreDisplay();
@@ -788,7 +844,6 @@ window.startWrongQuiz = function() {
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'block';
 
-    // Bắt đầu kích hoạt cơ chế chặn thoát trang/tắt chương trình khi đang làm bài
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     updateScoreDisplay();
@@ -1010,21 +1065,19 @@ window.startTimerTotal = function(durationSeconds) {
 };
 
 window.submitQuiz = function() {
-    clearInterval(AppState.timerInterval);
-    
-    // Gỡ bỏ cơ chế chặn thoát trang khi đã hoàn thành nộp bài
-    window.removeEventListener('beforeunload', handleBeforeUnload);
+    if (typeof handleBeforeUnload !== 'undefined') {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+    }
+
+    let maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_hs');
+    let mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+    let levelSelect = document.getElementById('level-select');
+    let level = levelSelect ? levelSelect.value : '';
+    let selectedTopicsStr = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value).join(', ');
 
     let totalQuestions = AppState.currentQuizData.length;
     let score = Math.round((AppState.correctCount / totalQuestions) * 10 * 10) / 10;
-    
-    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
-    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
-    const levelSelect = document.getElementById('level-select');
-    const level = levelSelect ? levelSelect.value : '';
-    const selectedTopicsStr = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value).join(', ');
 
-    // Trích xuất chi tiết câu trả lời để gửi kèm email
     let details = AppState.currentQuizData.map((item, index) => {
         let hasOptions = item.a || item.b || item.c || item.d;
         let userAnswerText = 'Chưa trả lời';
@@ -1035,17 +1088,17 @@ window.submitQuiz = function() {
 
         if (hasOptions) {
             if (isMultiChoice) {
-                correctAnswerText = correctKeys.map(k => k.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[k]) : (item[k] || ''))).join('; ');
+                correctAnswerText = correctKeys.map(k => k.toUpperCase() + '. ' + cleanOptionText(item[k])).join('; ');
                 if (Array.isArray(item._userAnswer) && item._userAnswer.length > 0) {
-                    userAnswerText = item._userAnswer.map(k => k.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[k]) : (item[k] || ''))).join('; ');
+                    userAnswerText = item._userAnswer.map(k => k.toUpperCase() + '. ' + cleanOptionText(item[k])).join('; ');
                     isCorrect = item._userAnswer.length === correctKeys.length && item._userAnswer.every(k => correctKeys.includes(k));
                 }
             } else {
                 let correctKey = correctKeys[0] || '';
-                correctAnswerText = correctKey ? correctKey.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[correctKey]) : (item[correctKey] || '')) : (item.correct || '');
+                correctAnswerText = correctKey ? correctKey.toUpperCase() + '. ' + cleanOptionText(item[correctKey]) : item.correct;
                 if (item._userAnswer && item._userAnswer.length > 0) {
                     let userKey = item._userAnswer[0];
-                    userAnswerText = userKey.toUpperCase() + '. ' + (typeof cleanOptionText === 'function' ? cleanOptionText(item[userKey]) : (item[userKey] || ''));
+                    userAnswerText = userKey.toUpperCase() + '. ' + cleanOptionText(item[userKey]);
                     isCorrect = (String(userKey).toLowerCase() === String(correctKey).toLowerCase());
                 }
             }
@@ -1066,7 +1119,6 @@ window.submitQuiz = function() {
         };
     });
 
-    const API_URL = "https://script.google.com/macros/s/AKfycbwABoWdjRcg_r9tVXJrLDsXFRMEbgUfn01QC6U5Z9lqwdwq5askg7CrQHRDJf8np-H/exec";
     if (maHS && mon) {
         fetch(API_URL, {
             method: 'POST',
@@ -1078,12 +1130,12 @@ window.submitQuiz = function() {
                 score: score, 
                 level: level, 
                 chuDe: selectedTopicsStr,
-                details: details // Bổ sung gói details vào đây
+                details: details 
             })
-        }).catch(err => console.log(err));
+        }).catch(err => console.log('Lỗi gửi kết quả:', err));
     }
 
-    const quizScreen = document.getElementById('quiz-screen');
+    let quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'none';
 
     let resultContainer = document.getElementById('result-container');
@@ -1096,10 +1148,10 @@ window.submitQuiz = function() {
 
     resultContainer.innerHTML = '<h2 style="text-align: center; color: #540606;">Kết Quả Bài Làm</h2>' +
         '<p style="font-size: 1.1em; text-align: center;">Số câu hỏi đúng: <b>' + AppState.correctCount + ' / ' + totalQuestions + '</b></p>' +
-        '<p style="font-size: 1.3em; text-align: center; color: #28a745; font-weight: bold;">Điểm số: ' + score + ' đ</p>' +
+        '<p style="font-size: 1.3em; text-align: center; font-weight: bold;">Điểm số: ' + score + ' đ</p>' +
         '<div style="display: flex; gap: 10px; margin-top: 20px;">' +
         '<button type="button" onclick="window.location.reload()" style="flex: 1; padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">Làm bài mới</button>' +
-        '<button type="button" onclick="window.viewReviewDetails()" style="flex: 1; padding: 12px; background: #6c757d; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🔍 Xem lại đề đã làm</button>' +
+        '<button type="button" onclick="window.viewReviewDetails()" style="flex: 1; padding: 12px; background: #6c757d; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">🔍 Xem lại chi tiết</button>' +
         '</div>' +
         '<div id="review-detail-box" style="margin-top: 20px;"></div>';
 };
