@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyRraHEvuMqEfEEoK68_e0YFaya_sz2dOA5O4BkAyCp3XEtpQSx5WjGubVPu5pt_vh1/exec";
 
 let AppState = {
     allQuizData: [],
@@ -11,13 +11,13 @@ let AppState = {
     wrongQuestions: []
 };
 
-// Hàm chặn tắt/đóng/load lại trang khi đang làm bài[cite: 3]
+// Hàm chặn tắt/đóng/load lại trang khi đang làm bài
 function handleBeforeUnload(e) {
     e.preventDefault();
     e.returnValue = '';
 }
 
-// 1. Lưu nhớ trạng thái môn và chủ đề đã chọn[cite: 3]
+// 1. Lưu nhớ trạng thái môn và chủ đề đã chọn
 window.saveUserSelections = function() {
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
@@ -171,52 +171,37 @@ document.addEventListener('click', function(e) {
 window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
-    const chuDeLower = (item.chuDe || '').toLowerCase();
-    const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
-    const isIrregularVerbs = chuDeLower.includes('dongtubatquytac') || chuDeLower.includes('động từ bất quy tắc');
 
-    let textToRead = '';
     let hasAnswered = false;
     const quizCards = document.querySelectorAll('.quiz-card');
     if (quizCards[index]) {
-        hasAnswered = quizCards[index].querySelector('.option-box.selected-option') !== null;
+        hasAnswered = quizCards[index].querySelector('.option-box.selected-option') !== null || 
+                      quizCards[index].querySelector('input[type="checkbox"]:checked') !== null ||
+                      quizCards[index].querySelector('input:disabled') !== null ||
+                      item._isAnswered;
     }
 
-    if (isVietAnh) {
-        textToRead = item.correct;
-    } else if (isIrregularVerbs) {
-        let match = item.question.match(/["']([^"']+)["']/);
-        if (match) {
-            textToRead = match[1].trim();
-        } else {
-            let matchDt = item.question.match(/(?:động từ|từ)\s+["']?([a-zA-Z\-]+)["']?/i);
-            if (matchDt) {
-                textToRead = matchDt[1].trim();
-            } else {
-                let cleanQ = item.question.toLowerCase()
-                    .replace(/dạng quá khứ|v2|v3|của|động từ|là gì|\(|\)|\?/g, '')
-                    .trim();
-                textToRead = cleanQ || item.question;
-            }
-        }
+    let textToRead = '';
+    if (!hasAnswered) {
+        // Chưa chọn: đọc nội dung câu hỏi / gợi ý
+        textToRead = item.question || '';
     } else {
-        textToRead = item.question;
-        if (hasAnswered) {
-            let correctText = '';
-            const correctKeys = getCorrectKeys(item);
-            if (correctKeys.length > 0) {
-                correctText = cleanOptionText(item[correctKeys[0]]);
+        // Đã chọn rồi: đọc câu đúng / đáp án đúng
+        const chuDeLower = (item.chuDe || '').toLowerCase();
+        const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
+        
+        if (isVietAnh && item.correct) {
+            textToRead = item.correct;
+        } else {
+            let correctKeys = item._correctKeys || getCorrectKeys(item);
+            if (correctKeys.length > 0 && item[correctKeys[0]]) {
+                textToRead = cleanOptionText(item[correctKeys[0]]);
             } else if (item.correct) {
-                correctText = cleanOptionText(item.correct);
-            }
-            if (correctText) {
-                textToRead = textToRead.replace(/\.{3,}|_+/g, ' ' + correctText + ' ');
+                textToRead = cleanOptionText(item.correct);
+            } else {
+                textToRead = item.question;
             }
         }
-    }
-
-    if (!hasAnswered && textToRead) {
-        textToRead = textToRead.replace(/\.{3,}|_+/g, ', ');
     }
 
     if (textToRead && 'speechSynthesis' in window) {
@@ -235,12 +220,12 @@ function escapeHTML(str) {
 }
 
 function removeDiacritics(str) {
-    if (!str) return ''; // An toàn khi gặp null, undefined, chuỗi rỗng
+    if (!str) return ''; 
     return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
 }
 
 function cleanKey(str) {
-    if (!str) return ''; // An toàn khi gặp null, undefined, chuỗi rỗng
+    if (!str) return ''; 
     return removeDiacritics(str).toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
@@ -552,11 +537,6 @@ function parseCustomDate(dateStr) {
     return isNaN(parsed) ? 0 : parsed;
 }
 
-function extractTopicFlexible(att) {
-    let raw = att.chuDe || att['Chủ đề'] || att.topic || '';
-    return cleanKey(raw);
-}
-
 // ==================== HÀM BẢNG XẾP HẠNG CHUẨN XÁC ====================
 
 window.renderLeaderboard = function(subjectFilter = null) {
@@ -601,7 +581,6 @@ window.renderLeaderboard = function(subjectFilter = null) {
         let bestScore = Math.max(...attempts.map(a => a._parsedScore));
         let latestAttempt = attempts[attempts.length - 1];
 
-        // Kiểm tra xem dữ liệu Google Sheets có sẵn cột Level không
         let hasExplicitLevel = attempts.some(a => a.level && a.level.trim() !== '');
 
         let record = {
@@ -612,7 +591,6 @@ window.renderLeaderboard = function(subjectFilter = null) {
         };
 
         if (hasExplicitLevel) {
-            // Nếu Google Sheets có điền sẵn cột Level, ưu tiên phân loại theo cột Level
             attempts.forEach(a => {
                 let lvl = String(a.level || '').trim();
                 let rec = { name: st.name, subject: st.subject, score: Number(a.score) || bestScore, date: a.date || '' };
@@ -622,12 +600,10 @@ window.renderLeaderboard = function(subjectFilter = null) {
                 if (lvl === "Đồng" && !dongList.some(x => x.name === st.name && x.subject === st.subject)) dongList.push(rec);
             });
         } else {
-            // Nếu cột Level trong Sheets đang trống, tự động tính toán thông minh dựa trên lịch sử điểm và chủ đề
             let count10 = attempts.filter(a => a._parsedScore === 10).length;
             let count9 = attempts.filter(a => a._parsedScore >= 9).length;
             let count8 = attempts.filter(a => a._parsedScore >= 8).length;
 
-            // Kiểm tra điều kiện Kim Cương: 3 lần liên tiếp đạt 10 điểm, khác chủ đề
             let sortedAttempts = [...attempts].sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
             let isKimCuong = false;
             if (sortedAttempts.length >= 3) {
