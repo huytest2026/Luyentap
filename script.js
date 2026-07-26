@@ -17,7 +17,143 @@ function handleBeforeUnload(e) {
     e.returnValue = '';
 }
 
-// 1. Lưu nhớ trạng thái môn và chủ đề đã chọn
+// ==========================================
+// HÀM TIỆN ÍCH CƠ BẢN VÀ PHÁT ÂM
+// ==========================================
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+    });
+}
+
+function removeDiacritics(str) {
+    if (!str) return ''; 
+    return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+}
+
+function cleanKey(str) {
+    if (!str) return ''; 
+    return removeDiacritics(str).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function standardizeSubject(monStr) {
+    if (!monStr) return '';
+    const cleanM = cleanKey(monStr);
+    if (cleanM.includes('anh') || cleanM.includes('english')) return 'Tiếng Anh';
+    if (cleanM.includes('toan') || cleanM.includes('math')) return 'Toán';
+    if (cleanM.includes('tiengviet') || cleanM.includes('tv')) return 'Tiếng Việt';
+    return monStr.trim();
+}
+
+function speakWord(text) {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        let cleanText = text.replace(/\/.+?\//g, '').trim();
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+    } else {
+        alert("Trình duyệt của bạn không hỗ trợ tính năng phát âm.");
+    }
+}
+
+// 1. Quản lý Tra từ điển (Đã tích hợp Anh - Việt)
+window.openDictionaryModal = function() {
+    const modal = document.getElementById('dict-modal');
+    if (modal) modal.style.display = 'flex';
+    const input = document.getElementById('dict-input');
+    if (input) {
+        input.focus();
+        let selectedText = window.getSelection().toString().trim();
+        if (selectedText && selectedText.split(' ').length === 1) {
+            input.value = selectedText;
+            window.lookupWord();
+        }
+    }
+};
+
+window.closeDictionaryModal = function() {
+    const modal = document.getElementById('dict-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.lookupWord = async function() {
+    const input = document.getElementById('dict-input');
+    const resultBox = document.getElementById('dict-result');
+    if (!input || !resultBox) return;
+
+    let word = input.value.trim().toLowerCase();
+    if (!word) {
+        resultBox.innerHTML = '<span style="color: red;">Vui lòng nhập từ cần tra!</span>';
+        return;
+    }
+
+    resultBox.innerHTML = 'Đang tra từ Anh - Việt...';
+    try {
+        let [dictResponse, transResponse] = await Promise.all([
+            fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`).catch(() => null),
+            fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|vi`).catch(() => null)
+        ]);
+
+        let vietnameseMeaning = '';
+        if (transResponse && transResponse.ok) {
+            let transData = await transResponse.json();
+            if (transData && transData.responseData && transData.responseData.translatedText) {
+                vietnameseMeaning = transData.responseData.translatedText;
+            }
+        }
+
+        if (!dictResponse || !dictResponse.ok) {
+            if (vietnameseMeaning && vietnameseMeaning.toLowerCase() !== word) {
+                resultBox.innerHTML = `<div style="margin-bottom: 8px;"><b style="font-size: 1.2em; color: #540606;">${escapeHTML(word)}</b></div>` +
+                                      `<div style="margin-top: 8px; padding: 10px; background: #e8f5e9; border-radius: 6px; border: 1px solid #c8e6c9;">` +
+                                      `<b style="color: #2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="color: #1b5e20; font-weight: bold; font-size: 1.1em;">${escapeHTML(vietnameseMeaning)}</span>` +
+                                      `</div>`;
+                return;
+            }
+            resultBox.innerHTML = `<span style="color: red;">Không tìm thấy từ "${escapeHTML(word)}" trong từ điển.</span>`;
+            return;
+        }
+
+        let data = await dictResponse.json();
+        if (data && data.length > 0) {
+            let entry = data[0];
+            let phonetic = entry.phonetic || (entry.phonetics && entry.phonetics.find(p => p.text)?.text) || '';
+            let audioUrl = entry.phonetics && entry.phonetics.find(p => p.audio)?.audio || '';
+
+            let html = `<div style="margin-bottom: 8px;"><b style="font-size: 1.2em; color: #540606;">${escapeHTML(entry.word)}</b> <span style="color: #666; font-style: italic;">${escapeHTML(phonetic)}</span>`;
+            if (audioUrl) {
+                html += ` <button type="button" onclick="new Audio('${audioUrl}').play()" style="background:#ffc107; border:none; border-radius:4px; padding:2px 8px; cursor:pointer; font-weight:bold;">🔊 Nghe</button>`;
+            }
+            html += `</div>`;
+
+            if (vietnameseMeaning && vietnameseMeaning.toLowerCase() !== word) {
+                html += `<div style="margin-top: 8px; padding: 10px; background: #e8f5e9; border-radius: 6px; border: 1px solid #c8e6c9;">` +
+                        `<b style="color: #2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="color: #1b5e20; font-weight: bold; font-size: 1.1em;">${escapeHTML(vietnameseMeaning)}</span>` +
+                        `</div>`;
+            }
+
+            entry.meanings.forEach(meaning => {
+                html += `<div style="margin-top: 10px;"><b style="color: #007bff;">(${escapeHTML(meaning.partOfSpeech)})</b>`;
+                meaning.definitions.slice(0, 2).forEach((def) => {
+                    html += `<div style="margin-left: 10px; margin-top: 4px;">• ${escapeHTML(def.definition)}`;
+                    if (def.example) {
+                        html += `<br><span style="color: #555; font-size: 0.95em; font-style: italic;">Ví dụ: "${escapeHTML(def.example)}"</span>`;
+                    }
+                    html += `</div>`;
+                });
+                html += `</div>`;
+            });
+            resultBox.innerHTML = html;
+        }
+    } catch(e) {
+        resultBox.innerHTML = '<span style="color: red;">Lỗi kết nối khi tra từ. Vui lòng thử lại sau!</span>';
+    }
+};
+
+// Lưu nhớ trạng thái môn và chủ đề đã chọn
 window.saveUserSelections = function() {
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
@@ -183,10 +319,8 @@ window.speakQuestion = function(index) {
 
     let textToRead = '';
     if (!hasAnswered) {
-        // Chưa chọn: đọc nội dung câu hỏi / gợi ý
         textToRead = item.question || '';
     } else {
-        // Đã chọn rồi: đọc câu đúng / đáp án đúng
         const chuDeLower = (item.chuDe || '').toLowerCase();
         const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
         
@@ -211,32 +345,6 @@ window.speakQuestion = function(index) {
         window.speechSynthesis.speak(utterance);
     }
 };
-
-function escapeHTML(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>"']/g, function(m) {
-        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
-    });
-}
-
-function removeDiacritics(str) {
-    if (!str) return ''; 
-    return String(str).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
-}
-
-function cleanKey(str) {
-    if (!str) return ''; 
-    return removeDiacritics(str).toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-function standardizeSubject(monStr) {
-    if (!monStr) return '';
-    const cleanM = cleanKey(monStr);
-    if (cleanM.includes('anh') || cleanM.includes('english')) return 'Tiếng Anh';
-    if (cleanM.includes('toan') || cleanM.includes('math')) return 'Toán';
-    if (cleanM.includes('tiengviet') || cleanM.includes('tv')) return 'Tiếng Việt';
-    return monStr.trim();
-}
 
 function normalizeItem(item) {
     if (!item) return null;
@@ -402,7 +510,6 @@ window.initInterface = function() {
     window.renderLeaderboard();
     window.updateTopicList();
     window.updateMadeList();
-    
     window.restoreUserSelections();
 };
 
@@ -512,13 +619,9 @@ window.handleQuizData = function(data) {
             });
         }
 
-        console.log("Đã nạp thành công tổng số dòng vào AppState.rankings:", AppState.rankings.length);
-
         window.initInterface();
     }
 };
-
-// ==================== HÀM HỖ TRỢ XỬ LÝ NGÀY THÁNG ====================
 
 function parseCustomDate(dateStr) {
     if (!dateStr) return 0;
@@ -536,8 +639,6 @@ function parseCustomDate(dateStr) {
     let parsed = Date.parse(str);
     return isNaN(parsed) ? 0 : parsed;
 }
-
-// ==================== HÀM BẢNG XẾP HẠNG CHUẨN XÁC ====================
 
 window.renderLeaderboard = function(subjectFilter = null) {
     const list = document.getElementById('ranking-list');
@@ -624,18 +725,10 @@ window.renderLeaderboard = function(subjectFilter = null) {
                 }
             }
 
-            if (isKimCuong) {
-                kimCuongList.push(record);
-            }
-            if (count10 > 0) {
-                vangList.push(record);
-            }
-            if (count9 >= 2) {
-                bacList.push(record);
-            }
-            if (count8 >= 2) {
-                dongList.push(record);
-            }
+            if (isKimCuong) kimCuongList.push(record);
+            if (count10 > 0) vangList.push(record);
+            if (count9 >= 2) bacList.push(record);
+            if (count8 >= 2) dongList.push(record);
         }
     }
 
@@ -678,40 +771,6 @@ function extractTopicFlexible(att) {
         }
     }
     return '';
-}
-
-function countKimCuongSetsFlexible(attempts) {
-    let sorted = [...attempts].sort((a, b) => {
-        let d1 = parseCustomDate(a.date || a['Ngày'] || '');
-        let d2 = parseCustomDate(b.date || b['Ngày'] || '');
-        return d1 - d2;
-    });
-    
-    if (sorted.length < 3) return 0;
-
-    let setsCount = 0;
-    let i = 0;
-    while (i <= sorted.length - 3) {
-        let s1 = sorted[i]._parsedScore;
-        let s2 = sorted[i+1]._parsedScore;
-        let s3 = sorted[i+2]._parsedScore;
-
-        let t1 = extractTopicFlexible(sorted[i]);
-        let t2 = extractTopicFlexible(sorted[i+1]);
-        let t3 = extractTopicFlexible(sorted[i+2]);
-
-        if (s1 === 10 && s2 === 10 && s3 === 10) {
-            if (!t1 || !t2 || !t3 || (t1 !== t2 && t2 !== t3 && t1 !== t3)) {
-                setsCount++;
-                i += 3;
-            } else {
-                i++;
-            }
-        } else {
-            i++;
-        }
-    }
-    return setsCount;
 }
 
 function getCorrectKeys(item) {
@@ -1368,5 +1427,241 @@ window.backToHome = function() {
         document.getElementById('start-screen').style.display = 'block';
         const resContainer = document.getElementById('result-container');
         if (resContainer) resContainer.remove();
+    }
+};
+
+// TỰ ĐỘNG TRA TỪ KHI BÔI ĐEN HOẶC CHỌN TỪ TRÊN MÀN HÌNH
+document.addEventListener('mouseup', function() {
+    setTimeout(() => {
+        let selectedText = window.getSelection().toString().trim();
+        if (selectedText && selectedText.split(/\s+/).length === 1 && /^[a-zA-ZÀ-ỹ]+$/.test(selectedText)) {
+            const modal = document.getElementById('dict-modal');
+            const input = document.getElementById('dict-input');
+            if (modal && input) {
+                if (modal.style.display !== 'flex' || input.value.trim().toLowerCase() !== selectedText.toLowerCase()) {
+                    modal.style.display = 'flex';
+                    input.value = selectedText;
+                    window.lookupWord();
+                }
+            }
+        }
+    }, 100);
+});
+
+document.addEventListener('touchend', function() {
+    setTimeout(() => {
+        let selectedText = window.getSelection().toString().trim();
+        if (selectedText && selectedText.split(/\s+/).length === 1 && /^[a-zA-ZÀ-ỹ]+$/.test(selectedText)) {
+            const modal = document.getElementById('dict-modal');
+            const input = document.getElementById('dict-input');
+            if (modal && input) {
+                modal.style.display = 'flex';
+                input.value = selectedText;
+                window.lookupWord();
+            }
+        }
+    }, 200);
+});
+
+// ==========================================
+// QUẢN LÝ BẢNG ĐỘNG TỪ BẤT QUY TẮC (CÓ IPA & PHÁT ÂM)
+// ==========================================
+const IRREGULAR_VERBS_DATA = [
+    { v1: "be", ipa1: "/biː/", v2: "was / were", ipa2: "/wɒz / wɜː/", v3: "been", ipa3: "/biːn/", meaning: "là, ở" },
+    { v1: "beat", ipa1: "/biːt/", v2: "beat", ipa2: "/biːt/", v3: "beaten", ipa3: "/ˈbiːtn/", meaning: "đánh, đập" },
+    { v1: "become", ipa1: "/bɪˈkʌm/", v2: "became", ipa2: "/bɪˈkeɪm/", v3: "become", ipa3: "/bɪˈkʌm/", meaning: "trở thành" },
+    { v1: "begin", ipa1: "/bɪˈɡɪn/", v2: "began", ipa2: "/bɪˈɡæn/", v3: "begun", ipa3: "/bɪˈɡʌn/", meaning: "bắt đầu" },
+    { v1: "bite", ipa1: "/baɪt/", v2: "bit", ipa2: "/bɪt/", v3: "bitten", ipa3: "/ˈbɪtn/", meaning: "cắn" },
+    { v1: "blow", ipa1: "/bləʊ/", v2: "blew", ipa2: "/bluː/", v3: "blown", ipa3: "/bləʊn/", meaning: "thổi" },
+    { v1: "break", ipa1: "/breɪk/", v2: "broke", ipa2: "/brəʊk/", v3: "broken", ipa3: "/ˈbrəʊkən/", meaning: "làm vỡ, gãy" },
+    { v1: "bring", ipa1: "/brɪŋ/", v2: "brought", ipa2: "/brɔːt/", v3: "brought", ipa3: "/brɔːt/", meaning: "mang lại" },
+    { v1: "build", ipa1: "/bɪld/", v2: "built", ipa2: "/bɪlt/", v3: "built", ipa3: "/bɪlt/", meaning: "xây dựng" },
+    { v1: "buy", ipa1: "/baɪ/", v2: "bought", ipa2: "/brɔːt/", v3: "bought", ipa3: "/brɔːt/", meaning: "mua" },
+    { v1: "catch", ipa1: "/kætʃ/", v2: "caught", ipa2: "/kɔːt/", v3: "caught", ipa3: "/kɔːt/", meaning: "bắt, tóm" },
+    { v1: "choose", ipa1: "/tʃuːz/", v2: "chose", ipa2: "/tʃəʊz/", v3: "chosen", ipa3: "/ˈtʃəʊzn/", meaning: "chọn, lựa" },
+    { v1: "come", ipa1: "/kʌm/", v2: "came", ipa2: "/keɪm/", v3: "come", ipa3: "/kʌm/", meaning: "đến, đi đến" },
+    { v1: "cost", ipa1: "/kɒst/", v2: "cost", ipa2: "/kɒst/", v3: "cost", ipa3: "/kɒst/", meaning: "có giá là" },
+    { v1: "cut", ipa1: "/kʌt/", v2: "cut", ipa2: "/kʌt/", v3: "cut", ipa3: "/kʌt/", meaning: "cắt" },
+    { v1: "do", ipa1: "/duː/", v2: "did", ipa2: "/dɪd/", v3: "done", ipa3: "/dʌn/", meaning: "làm" },
+    { v1: "draw", ipa1: "/drɔː/", v2: "drew", ipa2: "/druː/", v3: "drawn", ipa3: "/drɔːn/", meaning: "vẽ, kéo" },
+    { v1: "drink", ipa1: "/drɪŋk/", v2: "drank", ipa2: "/dræŋk/", v3: "drunk", ipa3: "/drʌŋk/", meaning: "uống" },
+    { v1: "drive", ipa1: "/draɪv/", v2: "drove", ipa2: "/drəʊv/", v3: "driven", ipa3: "/ˈdrɪvn/", meaning: "lái xe" },
+    { v1: "eat", ipa1: "/iːt/", v2: "ate", ipa2: "/et/", v3: "eaten", ipa3: "/ˈiːtn/", meaning: "ăn" },
+    { v1: "fall", ipa1: "/fɔːl/", v2: "fell", ipa2: "/fel/", v3: "fallen", ipa3: "/ˈfɔːlən/", meaning: "ngã, rơi" },
+    { v1: "feel", ipa1: "/fiːl/", v2: "felt", ipa2: "/felt/", v3: "felt", ipa3: "/felt/", meaning: "cảm thấy" },
+    { v1: "find", ipa1: "/faɪnd/", v2: "found", ipa2: "/faʊnd/", v3: "found", ipa3: "/faʊnd/", meaning: "tìm thấy" },
+    { v1: "fly", ipa1: "/flaɪ/", v2: "flew", ipa2: "/fluː/", v3: "flown", ipa3: "/fləʊn/", meaning: "bay" },
+    { v1: "forget", ipa1: "/fəˈɡet/", v2: "forgot", ipa2: "/fəˈɡɒt/", v3: "forgotten", ipa3: "/fəˈɡɒtn/", meaning: "quên" },
+    { v1: "get", ipa1: "/ɡet/", v2: "got", ipa2: "/ɡɒt/", v3: "got / gotten", ipa3: "/ɡɒt / ˈɡɒtn/", meaning: "được, nhận" },
+    { v1: "give", ipa1: "/ɡɪv/", v2: "gave", ipa2: "/ɡeɪv/", v3: "given", ipa3: "/ˈɡɪvn/", meaning: "cho, tặng" },
+    { v1: "go", ipa1: "/ɡəʊ/", v2: "went", ipa2: "/went/", v3: "gone", ipa3: "/ɡɒn/", meaning: "đi" },
+    { v1: "grow", ipa1: "/ɡrəʊ/", v2: "grew", ipa2: "/ɡruː/", v3: "grown", ipa3: "/ɡrəʊn/", meaning: "mọc, phát triển" },
+    { v1: "have", ipa1: "/hæv/", v2: "had", ipa2: "/hæd/", v3: "had", ipa3: "/hæd/", meaning: "có" },
+    { v1: "hear", ipa1: "/hɪər/", v2: "heard", ipa2: "/hɜːd/", v3: "heard", ipa3: "/hɜːd/", meaning: "nghe" },
+    { v1: "hide", ipa1: "/haɪd/", v2: "hid", ipa2: "/hɪd/", v3: "hidden", ipa3: "/ˈhɪdn/", meaning: "trốn, giấu" },
+    { v1: "hit", ipa1: "/hɪt/", v2: "hit", ipa2: "/hɪt/", v3: "hit", ipa3: "/hɪt/", meaning: "đánh" },
+    { v1: "hold", ipa1: "/həʊld/", v2: "held", ipa2: "/held/", v3: "held", ipa3: "/held/", meaning: "cầm, nắm" },
+    { v1: "hurt", ipa1: "/hɜːt/", v2: "hurt", ipa2: "/hɜːt/", v3: "hurt", ipa3: "/hɜːt/", meaning: "làm đau" },
+    { v1: "keep", ipa1: "/kiːp/", v2: "kept", ipa2: "/kept/", v3: "kept", ipa3: "/kept/", meaning: "giữ" },
+    { v1: "know", ipa1: "/nəʊ/", v2: "knew", ipa2: "/njuː/", v3: "known", ipa3: "/nəʊn/", meaning: "biết" },
+    { v1: "leave", ipa1: "/liːv/", v2: "left", ipa2: "/left/", v3: "left", ipa3: "/left/", meaning: "rời đi, để lại" },
+    { v1: "lend", ipa1: "/lend/", v2: "lent", ipa2: "/lent/", v3: "lent", ipa3: "/lent/", meaning: "cho mượn" },
+    { v1: "let", ipa1: "/let/", v2: "let", ipa2: "/let/", v3: "let", ipa3: "/let/", meaning: "cho phép" },
+    { v1: "lie", ipa1: "/laɪ/", v2: "lay", ipa2: "/leɪ/", v3: "lain", ipa3: "/leɪn/", meaning: "nằm" },
+    { v1: "lose", ipa1: "/luːz/", v2: "lost", ipa2: "/lɒst/", v3: "lost", ipa3: "/lɒst/", meaning: "mất, thua" },
+    { v1: "make", ipa1: "/meɪk/", v2: "made", ipa2: "/meɪd/", v3: "made", ipa3: "/meɪd/", meaning: "làm, chế tạo" },
+    { v1: "meet", ipa1: "/miːt/", v2: "met", ipa2: "/met/", v3: "met", ipa3: "/met/", meaning: "gặp" },
+    { v1: "pay", ipa1: "/peɪ/", v2: "paid", ipa2: "/peɪd/", v3: "paid", ipa3: "/peɪd/", meaning: "trả tiền" },
+    { v1: "put", ipa1: "/pʊt/", v2: "put", ipa2: "/pʊt/", v3: "put", ipa3: "/pʊt/", meaning: "đặt, để" },
+    { v1: "read", ipa1: "/riːd/", v2: "read", ipa2: "/red/", v3: "read", ipa3: "/red/", meaning: "đọc" },
+    { v1: "ride", ipa1: "/raɪd/", v2: "rode", ipa2: "/rəʊd/", v3: "ridden", ipa3: "/ˈrɪdn/", meaning: "cưỡi, lái" },
+    { v1: "ring", ipa1: "/rɪŋ/", v2: "rang", ipa2: "/ræŋ/", v3: "rung", ipa3: "/rʌŋ/", meaning: "reo, rung chuông" },
+    { v1: "rise", ipa1: "/raɪz/", v2: "rose", ipa2: "/rəʊz/", v3: "risen", ipa3: "/ˈrɪzn/", meaning: "mọc, tăng lên" },
+    { v1: "run", ipa1: "/rʌn/", v2: "ran", ipa2: "/ræn/", v3: "run", ipa3: "/rʌn/", meaning: "chạy" },
+    { v1: "say", ipa1: "/seɪ/", v2: "said", ipa2: "/sed/", v3: "said", ipa3: "/sed/", meaning: "nói" },
+    { v1: "see", ipa1: "/siː/", v2: "saw", ipa2: "/sɔː/", v3: "seen", ipa3: "/siːn/", meaning: "nhìn thấy" },
+    { v1: "sell", ipa1: "/sel/", v2: "sold", ipa2: "/səʊld/", v3: "sold", ipa3: "/səʊld/", meaning: "bán" },
+    { v1: "send", ipa1: "/send/", v2: "sent", ipa2: "/sent/", v3: "sent", ipa3: "/sent/", meaning: "gửi" },
+    { v1: "show", ipa1: "/ʃəʊ/", v2: "showed", ipa2: "/ʃəʊd/", v3: "shown", ipa3: "/ʃəʊn/", meaning: "trình bày, chỉ" },
+    { v1: "shut", ipa1: "/ʃʌt/", v2: "shut", ipa2: "/ʃʌt/", v3: "shut", ipa3: "/ʃʌt/", meaning: "đóng lại" },
+    { v1: "sing", ipa1: "/sɪŋ/", v2: "sang", ipa2: "/sæŋ/", v3: "sung", ipa3: "/sʌŋ/", meaning: "hát" },
+    { v1: "sit", ipa1: "/sɪt/", v2: "sat", ipa2: "/sæt/", v3: "sat", ipa3: "/sæt/", meaning: "ngồi" },
+    { v1: "sleep", ipa1: "/sliːp/", v2: "slept", ipa2: "/slept/", v3: "slept", ipa3: "/slept/", meaning: "ngủ" },
+    { v1: "speak", ipa1: "/spiːk/", v2: "spoke", ipa2: "/spəʊk/", v3: "spoken", ipa3: "/ˈspəʊkən/", meaning: "nói" },
+    { v1: "spend", ipa1: "/spend/", v2: "spent", ipa2: "/spent/", v3: "spent", ipa3: "/spent/", meaning: "tiêu xài, trải qua" },
+    { v1: "stand", ipa1: "/stænd/", v2: "stood", ipa2: "/stʊd/", v3: "stood", ipa3: "/stʊd/", meaning: "đứng" },
+    { v1: "swim", ipa1: "/swɪm/", v2: "swam", ipa2: "/swæm/", v3: "swum", ipa3: "/swʌm/", meaning: "bơi" },
+    { v1: "take", ipa1: "/teɪk/", v2: "took", ipa2: "/tʊk/", v3: "taken", ipa3: "/ˈteɪkən/", meaning: "cầm, lấy" },
+    { v1: "teach", ipa1: "/tiːtʃ/", v2: "taught", ipa2: "/tɔːt/", v3: "taught", ipa3: "/tɔːt/", meaning: "dạy" },
+    { v1: "tear", ipa1: "/teər/", v2: "tore", ipa2: "/tɔːr/", v3: "torn", ipa3: "/tɔːrn/", meaning: "xé" },
+    { v1: "tell", ipa1: "/tel/", v2: "told", ipa2: "/təʊld/", v3: "told", ipa3: "/təʊld/", meaning: "kể, bảo" },
+    { v1: "think", ipa1: "/θɪŋk/", v2: "thought", ipa2: "/θɔːt/", v3: "thought", ipa3: "/θɔːt/", meaning: "suy nghĩ" },
+    { v1: "throw", ipa1: "/θrəʊ/", v2: "threw", ipa2: "/θruː/", v3: "thrown", ipa3: "/θrəʊn/", meaning: "ném, quăng" },
+    { v1: "understand", ipa1: "/ˌʌndəˈstænd/", v2: "understood", ipa2: "/ˌʌndəˈstʊd/", v3: "understood", ipa3: "/ˌʌndəˈstʊd/", meaning: "hiểu" },
+    { v1: "wake", ipa1: "/weɪk/", v2: "woke", ipa2: "/wəʊk/", v3: "woken", ipa3: "/ˈwəʊkən/", meaning: "thức dậy" },
+    { v1: "wear", ipa1: "/weər/", v2: "wore", ipa2: "/wɔːr/", v3: "worn", ipa3: "/wɔːrn/", meaning: "mặc" },
+    { v1: "win", ipa1: "/wɪn/", v2: "won", ipa2: "/wʌn/", v3: "won", ipa3: "/wʌn/", meaning: "thắng, chiến thắng" },
+    { v1: "write", ipa1: "/raɪt/", v2: "wrote", ipa2: "/rəʊt/", v3: "written", ipa3: "/ˈrɪtn/", meaning: "viết" }
+];
+
+window.openIrregularVerbsModal = function() {
+    const modal = document.getElementById('irregular-verbs-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        window.renderIrregularVerbsTable(IRREGULAR_VERBS_DATA);
+        const searchInput = document.getElementById('iv-search-input');
+        if (searchInput) searchInput.focus();
+    }
+};
+
+window.closeIrregularVerbsModal = function() {
+    const modal = document.getElementById('irregular-verbs-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.renderIrregularVerbsTable = function(dataArray) {
+    const resultList = document.getElementById('iv-result-list');
+    if (!resultList) return;
+
+    if (dataArray.length === 0) {
+        resultList.innerHTML = '<div style="text-align: center; color: #888; padding: 15px;">Không tìm thấy động từ phù hợp.</div>';
+        return;
+    }
+
+    let html = '<table style="width: 100%; border-collapse: collapse; font-size: 1.02em;">';
+    html += '<tr style="background: #540606; color: white; text-align: left;">' +
+            '<th style="padding: 10px; border: 1px solid #ddd;">V1 (Base)</th>' +
+            '<th style="padding: 10px; border: 1px solid #ddd;">V2 (Past)</th>' +
+            '<th style="padding: 10px; border: 1px solid #ddd;">V3 (Participle)</th>' +
+            '<th style="padding: 10px; border: 1px solid #ddd;">Ý nghĩa</th>' +
+            '</tr>';
+
+    dataArray.forEach((item, index) => {
+        let bg = index % 2 === 0 ? '#ffffff' : '#f1f3f5';
+        html += `<tr style="background: ${bg};">` +
+                `<td style="padding: 8px 10px; border: 1px solid #ddd;">` +
+                    `<div style="font-weight: bold; color: #007bff; cursor: pointer;" title="Nhấp để nghe phát âm" onclick="speakWord('${escapeHTML(item.v1)}')">${escapeHTML(item.v1)} 🔊</div>` +
+                    `<div style="color: #d9534f; font-family: monospace; font-size: 0.88em;">${escapeHTML(item.ipa1 || '')}</div>` +
+                `</td>` +
+                `<td style="padding: 8px 10px; border: 1px solid #ddd;">` +
+                    `<div style="font-weight: bold; color: #333; cursor: pointer;" title="Nhấp để nghe phát âm" onclick="speakWord('${escapeHTML(item.v2)}')">${escapeHTML(item.v2)} 🔊</div>` +
+                    `<div style="color: #d9534f; font-family: monospace; font-size: 0.88em;">${escapeHTML(item.ipa2 || '')}</div>` +
+                `</td>` +
+                `<td style="padding: 8px 10px; border: 1px solid #ddd;">` +
+                    `<div style="font-weight: bold; color: #333; cursor: pointer;" title="Nhấp để nghe phát âm" onclick="speakWord('${escapeHTML(item.v3)}')">${escapeHTML(item.v3)} 🔊</div>` +
+                    `<div style="color: #d9534f; font-family: monospace; font-size: 0.88em;">${escapeHTML(item.ipa3 || '')}</div>` +
+                `</td>` +
+                `<td style="padding: 8px 10px; border: 1px solid #ddd; font-style: italic;">${escapeHTML(item.meaning)}</td>` +
+                `</tr>`;
+    });
+    html += '</table>';
+    resultList.innerHTML = html;
+};
+
+window.filterIrregularVerbs = function() {
+    const input = document.getElementById('iv-search-input');
+    if (!input) return;
+    let keyword = removeDiacritics(input.value.trim().toLowerCase());
+
+    if (!keyword) {
+        window.renderIrregularVerbsTable(IRREGULAR_VERBS_DATA);
+        return;
+    }
+
+    let filtered = IRREGULAR_VERBS_DATA.filter(item => 
+        removeDiacritics(item.v1.toLowerCase()).includes(keyword) ||
+        removeDiacritics(item.v2.toLowerCase()).includes(keyword) ||
+        removeDiacritics(item.v3.toLowerCase()).includes(keyword) ||
+        removeDiacritics(item.meaning.toLowerCase()).includes(keyword) ||
+        (item.ipa1 && item.ipa1.toLowerCase().includes(keyword)) ||
+        (item.ipa2 && item.ipa2.toLowerCase().includes(keyword)) ||
+        (item.ipa3 && item.ipa3.toLowerCase().includes(keyword))
+    );
+
+    window.renderIrregularVerbsTable(filtered);
+};
+
+// ==========================================
+// QUẢN LÝ MÁY TÍNH BỎ TÚI (CALCULATOR)
+// ==========================================
+window.openCalculatorModal = function() {
+    const modal = document.getElementById('calc-modal');
+    if (modal) modal.style.display = 'flex';
+};
+
+window.closeCalculatorModal = function() {
+    const modal = document.getElementById('calc-modal');
+    if (modal) modal.style.display = 'none';
+};
+
+window.calcInput = function(value) {
+    const display = document.getElementById('calc-display');
+    if (display) {
+        display.value += value;
+    }
+};
+
+window.calcClear = function() {
+    const display = document.getElementById('calc-display');
+    if (display) {
+        display.value = '';
+    }
+};
+
+window.calcCalculate = function() {
+    const display = document.getElementById('calc-display');
+    if (!display || !display.value.trim()) return;
+
+    try {
+        let expression = display.value.replace(/×/g, '*').replace(/÷/g, '/');
+        let result = new Function(`return ${expression}`)();
+        
+        if (result !== undefined && !isNaN(result)) {
+            display.value = result;
+        } else {
+            display.value = 'Lỗi';
+        }
+    } catch (e) {
+        display.value = 'Lỗi';
     }
 };
