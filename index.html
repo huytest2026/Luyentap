@@ -6,7 +6,7 @@
     <title>Bài Kiểm Tra Toán Anh</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background-color: #e8eded; font-size: 1.05em; }
-        .container { background-color: #bbe9f0; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 650px; margin: auto; }
+        .container { background-color: #bbe9f0; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 650px; margin: auto; position: relative; }
         h1 { font-size: 1.8em; }
         h3 { font-size: 1.3em; }
         label { font-size: 1.05em; font-weight: bold; color: #333; }
@@ -31,6 +31,27 @@
             border-top-left-radius: 10px;
             border-top-right-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        /* Modal chung (Tra từ & Động từ bất quy tắc) */
+        #dict-modal, #irregular-verbs-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .dict-content {
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 650px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            border: 2px solid #540606;
+            position: relative;
         }
     </style>
 </head>
@@ -58,14 +79,13 @@
         </select>
     </div>
 
-    <!-- NÚT BẬT/TẮT VÀ KHUNG CHỌN MÃ ĐỀ (Mặc định ẩn) -->
+    <!-- NÚT BẬT/TẮT VÀ KHUNG CHỌN MÃ ĐỀ -->
     <div style="margin-top: 15px; margin-bottom: 15px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #540606;">
         <label style="cursor: pointer; font-weight: bold; color: #540606; display: flex; align-items: center; gap: 10px; font-size: 1.1em;">
             <input type="checkbox" id="toggle-made" onchange="window.toggleMadeMode()" style="width: 20px; height: 20px; cursor: pointer;"> 
             Làm bài theo Mã đề (MADE) riêng
         </label>
 
-        <!-- Khung chứa ô chọn mã đề, mặc định display: none để ẩn đi -->
         <div id="made-container" style="display: none; margin-top: 12px;">
             <select id="made-select" onchange="window.handleMadeChange()" style="width: 100%; padding: 14px; margin: 5px 0; font-size: 1.1em; border: 1px solid #540606; border-radius: 8px;">
                 <option value="">-- Chọn mã đề --</option>
@@ -91,14 +111,49 @@
 <div class="container" id="quiz-screen" style="display:none;">
     <div class="quiz-sticky-header">
         <div>⏱️ <span id="timer-display" style="color: red; font-size: 1.15em;">--:--</span></div>
-        <div>
-            <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
+        <div style="display: flex; gap: 8px;">
+            <button type="button" onclick="window.openDictionaryModal()" style="background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
+            <button type="button" onclick="window.openIrregularVerbsModal()" style="background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
+            <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
         </div>
         <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
     </div>
     
     <div id="quiz" style="margin-top: 15px;"></div>
     <button type="button" id="submit-btn" onclick="window.submitQuiz()" style="width: 100%; padding: 16px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 8px; font-weight: bold; font-size: 1.2em; margin-top: 15px;">Nộp bài</button>
+</div>
+
+<!-- MODAL TRA TỪ ĐIỂN -->
+<div id="dict-modal">
+    <div class="dict-content">
+        <h3 style="color: #540606; margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
+            📖 Tra từ điển tiếng Anh
+            <button type="button" onclick="window.closeDictionaryModal()" style="background: none; border: none; font-size: 1.2em; cursor: pointer; font-weight: bold;">✕</button>
+        </h3>
+        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+            <input type="text" id="dict-input" placeholder="Nhập từ tiếng Anh cần tra..." onkeydown="if(event.key==='Enter') window.lookupWord()" style="margin: 0; flex: 1; padding: 10px; border: 1px solid #540606; border-radius: 6px;">
+            <button type="button" onclick="window.lookupWord()" style="background: #007bff; color: white; border: none; padding: 0 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">Tra</button>
+        </div>
+        <div id="dict-result" style="max-height: 250px; overflow-y: auto; background: #f8f9fa; padding: 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 1.05em;">
+            Nhập từ và bấm "Tra" để xem nghĩa, phiên âm...
+        </div>
+    </div>
+</div>
+
+<!-- MODAL BẢNG ĐỘNG TỪ BẤT QUY TẮC -->
+<div id="irregular-verbs-modal">
+    <div class="dict-content" style="max-width: 700px;">
+        <h3 style="color: #540606; margin-top: 0; display: flex; justify-content: space-between; align-items: center;">
+            📚 Bảng Động Từ Bất Quy Tắc Tiếng Anh
+            <button type="button" onclick="window.closeIrregularVerbsModal()" style="background: none; border: none; font-size: 1.2em; cursor: pointer; font-weight: bold;">✕</button>
+        </h3>
+        <div style="margin-bottom: 12px;">
+            <input type="text" id="iv-search-input" placeholder="Nhập từ cần tìm (V1, V2, V3 hoặc nghĩa tiếng Việt)..." oninput="window.filterIrregularVerbs()" style="margin: 0; width: 100%; padding: 12px; border: 1px solid #540606; border-radius: 8px; box-sizing: border-box;">
+        </div>
+        <div id="iv-result-list" style="max-height: 350px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px solid #ddd;">
+            <!-- Danh sách động từ sẽ được render tự động qua JS -->
+        </div>
+    </div>
 </div>
 
 <script src="script.js"></script>
