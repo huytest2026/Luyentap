@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxCSrWdYEmOEarN8hn3ISK1Pu_Wv3GujZrK5tyWWbmcJ0f4uP1OX63PmnPUAsHtzcU/exec";
 
 let AppState = {
     allQuizData: [],
@@ -803,6 +803,26 @@ function getCorrectKeys(item) {
 }
 
 window.startQuiz = function() {
+    // Kiểm tra môn học đang chọn để ẩn/hiện nút phù hợp trên header
+    const subjectSelect = document.getElementById('subject-select');
+    const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
+
+    const btnCalc = document.getElementById('btn-calc');
+    const btnDict = document.getElementById('btn-dict');
+    const btnVerbs = document.getElementById('btn-verbs');
+
+    // Kiểm tra nếu là môn Toán (có chứa chữ 'toan' hoặc tương tự)
+    if (selectedSubject.includes('toan') || selectedSubject.includes('math')) {
+        if (btnCalc) btnCalc.style.display = 'block';
+        if (btnDict) btnDict.style.display = 'none';
+        if (btnVerbs) btnVerbs.style.display = 'none';
+    } else {
+        // Mặc định hoặc môn Tiếng Anh
+        if (btnCalc) btnCalc.style.display = 'none';
+        if (btnDict) btnDict.style.display = 'block';
+        if (btnVerbs) btnVerbs.style.display = 'block';
+    }
+
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
