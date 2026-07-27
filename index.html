@@ -112,8 +112,9 @@
     <div class="quiz-sticky-header">
         <div>⏱️ <span id="timer-display" style="color: red; font-size: 1.15em;">--:--</span></div>
         <div style="display: flex; gap: 8px;">
-            <button type="button" onclick="window.openDictionaryModal()" style="background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
-            <button type="button" onclick="window.openIrregularVerbsModal()" style="background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
+            <button type="button" id="btn-calc" onclick="window.openCalculatorModal()" style="display: none; background: #28a745; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🧮 Máy tính</button>
+            <button type="button" id="btn-dict" onclick="window.openDictionaryModal()" style="display: none; background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📖 Tra từ</button>
+            <button type="button" id="btn-verbs" onclick="window.openIrregularVerbsModal()" style="display: none; background: #e0a800; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">📚 ĐT Bất Quy Tắc</button>
             <button type="button" onclick="window.backToHome()" style="background: #6c757d; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-size: 0.95em; font-weight: bold;">🏠 Trang chủ</button>
         </div>
         <div>Đúng: <span id="correct-count-display" style="color: green;">0</span> | Sai: <span id="wrong-count-display" style="color: red;">0</span></div>
