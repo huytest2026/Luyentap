@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzmrdy3uWiVDt9Mzx9i_mzFVwj3Kwns2t9JRqPMBEmxjpBL7pGsS1cJ-lDvhcvxG-72/exec";
 
 let AppState = {
     allQuizData: [],
@@ -49,7 +49,13 @@ function standardizeSubject(monStr) {
 function speakWord(text) {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        let cleanText = text.replace(/\/.+?\//g, '').trim();
+        
+        // Đã thêm lệnh loại bỏ dấu gạch dưới (_) và chuẩn hóa khoảng trắng
+        let cleanText = text.replace(/\/.+?\//g, '')
+                            .replace(/_/g, ' ')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+                            
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.lang = 'en-US';
         utterance.rate = 0.9;
@@ -83,20 +89,17 @@ window.lookupWord = async function() {
     const input = document.getElementById('dict-input');
     const resultBox = document.getElementById('dict-result');
     if (!input || !resultBox) return;
-
     let word = input.value.trim().toLowerCase();
     if (!word) {
         resultBox.innerHTML = '<span style="color: red;">Vui lòng nhập từ cần tra!</span>';
         return;
     }
-
     resultBox.innerHTML = 'Đang tra từ Anh - Việt...';
     try {
         let [dictResponse, transResponse] = await Promise.all([
             fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`).catch(() => null),
             fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=en|vi`).catch(() => null)
         ]);
-
         let vietnameseMeaning = '';
         if (transResponse && transResponse.ok) {
             let transData = await transResponse.json();
@@ -104,7 +107,6 @@ window.lookupWord = async function() {
                 vietnameseMeaning = transData.responseData.translatedText;
             }
         }
-
         if (!dictResponse || !dictResponse.ok) {
             if (vietnameseMeaning && vietnameseMeaning.toLowerCase() !== word) {
                 resultBox.innerHTML = `<div style="margin-bottom: 8px;"><b style="font-size: 1.2em; color: #540606;">${escapeHTML(word)}</b></div>` +
@@ -116,25 +118,21 @@ window.lookupWord = async function() {
             resultBox.innerHTML = `<span style="color: red;">Không tìm thấy từ "${escapeHTML(word)}" trong từ điển.</span>`;
             return;
         }
-
         let data = await dictResponse.json();
         if (data && data.length > 0) {
             let entry = data[0];
             let phonetic = entry.phonetic || (entry.phonetics && entry.phonetics.find(p => p.text)?.text) || '';
             let audioUrl = entry.phonetics && entry.phonetics.find(p => p.audio)?.audio || '';
-
             let html = `<div style="margin-bottom: 8px;"><b style="font-size: 1.2em; color: #540606;">${escapeHTML(entry.word)}</b> <span style="color: #666; font-style: italic;">${escapeHTML(phonetic)}</span>`;
             if (audioUrl) {
                 html += ` <button type="button" onclick="new Audio('${audioUrl}').play()" style="background:#ffc107; border:none; border-radius:4px; padding:2px 8px; cursor:pointer; font-weight:bold;">🔊 Nghe</button>`;
             }
             html += `</div>`;
-
             if (vietnameseMeaning && vietnameseMeaning.toLowerCase() !== word) {
                 html += `<div style="margin-top: 8px; padding: 10px; background: #e8f5e9; border-radius: 6px; border: 1px solid #c8e6c9;">` +
                         `<b style="color: #2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="color: #1b5e20; font-weight: bold; font-size: 1.1em;">${escapeHTML(vietnameseMeaning)}</span>` +
                         `</div>`;
             }
-
             entry.meanings.forEach(meaning => {
                 html += `<div style="margin-top: 10px;"><b style="color: #007bff;">(${escapeHTML(meaning.partOfSpeech)})</b>`;
                 meaning.definitions.slice(0, 2).forEach((def) => {
@@ -155,37 +153,39 @@ window.lookupWord = async function() {
 
 // Lưu nhớ trạng thái môn và chủ đề đã chọn
 window.saveUserSelections = function() {
-    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
-    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
-    const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
-    
-    if (maHS) localStorage.setItem('saved_maHS', maHS);
-    if (mon) localStorage.setItem('saved_mon', mon);
-    if (selectedTopics.length > 0) {
-        localStorage.setItem('saved_topics_' + maHS + '_' + mon, JSON.stringify(selectedTopics));
-    }
+    try {
+        const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+        const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
+        const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
+        
+        if (maHS) localStorage.setItem('saved_maHS', maHS);
+        if (mon) localStorage.setItem('saved_mon', mon);
+        if (selectedTopics.length > 0) {
+            localStorage.setItem('saved_topics_' + maHS + '_' + mon, JSON.stringify(selectedTopics));
+        }
+    } catch(e) {}
 };
 
 window.restoreUserSelections = function() {
-    const savedMon = localStorage.getItem('saved_mon');
-    const subjectSelect = document.getElementById('subject-select');
-    if (savedMon && subjectSelect) {
-        subjectSelect.value = savedMon;
-        window.handleSubjectChange();
-        
-        const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
-        const savedTopics = localStorage.getItem('saved_topics_' + maHS + '_' + savedMon);
-        if (savedTopics) {
-            try {
+    try {
+        const savedMon = localStorage.getItem('saved_mon');
+        const subjectSelect = document.getElementById('subject-select');
+        if (savedMon && subjectSelect) {
+            subjectSelect.value = savedMon;
+            window.handleSubjectChange();
+            
+            const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : '';
+            const savedTopics = localStorage.getItem('saved_topics_' + maHS + '_' + savedMon);
+            if (savedTopics) {
                 let topicsArray = JSON.parse(savedTopics);
                 setTimeout(() => {
                     document.querySelectorAll('input[name="topic"]').forEach(cb => {
                         cb.checked = topicsArray.includes(cb.value);
                     });
                 }, 200);
-            } catch(e) {}
+            }
         }
-    }
+    } catch(e) {}
 };
 
 window.handleMadeChange = function() {
@@ -198,11 +198,13 @@ window.handleMadeChange = function() {
         previewEl.innerHTML = '';
         return;
     }
-
-    const found = AppState.allQuizData.find(i => String(i.made).trim() === selectedMade && i.passage && i.passage.trim() !== '');
+    const found = AppState.allQuizData.find(i => 
+        (String(i.made).trim() === selectedMade || String(i.chuDe).trim() === selectedMade) && 
+        i.passage && i.passage.trim() !== ''
+    );
     if (found) {
         const subText = escapeHTML(found.passage.substring(0, 150));
-        previewEl.innerHTML = '<div style="background: #f8f9fa; border: 1px solid #540606; padding: 12px; border-radius: 6px; margin-top: 5px; font-size: 1.05em;"><b style="color: #540606;">📄 Xem trước đoạn văn:</b><br>' + subText + '...</div>';
+        previewEl.innerHTML = '<div style="background: #f8f9fa; border: 1px solid #540606; padding: 12px; border-radius: 6px; margin-top: 5px; font-size: 1.05em;"><b style="color: #540606;">📄 Xem trước đoạn văn/bài nghe:</b><br>' + subText + '...</div>';
     } else {
         previewEl.innerHTML = '';
     }
@@ -211,19 +213,15 @@ window.handleMadeChange = function() {
 window.toggleMadeMode = function() {
     const toggleMade = document.getElementById('toggle-made');
     if (!toggleMade) return;
-
     let madeContainer = document.getElementById('made-container');
     const topicContainer = document.getElementById('topic-container');
     const topicWrapper = topicContainer ? topicContainer.previousElementSibling : null;
     const selectAllBtn = document.querySelector('button[onclick*="toggleAllTopics"]') || Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Chọn/Bỏ chọn tất cả'));
-
     const isChecked = toggleMade.checked;
-
     if (madeContainer) madeContainer.style.display = isChecked ? 'block' : 'none';
     if (topicContainer) topicContainer.style.display = isChecked ? 'none' : 'block';
     if (topicWrapper && topicWrapper !== madeContainer) topicWrapper.style.display = isChecked ? 'none' : 'block';
     if (selectAllBtn) selectAllBtn.style.display = isChecked ? 'none' : 'inline-block';
-
     if (isChecked) {
         window.updateMadeList();
     }
@@ -307,6 +305,23 @@ document.addEventListener('click', function(e) {
 window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
+    
+    // ==========================================
+    // 1. NHẬN DIỆN CÁC DẠNG BÀI VÀ XỬ LÝ CHỮ (GIỮ NGUYÊN)
+    // ==========================================
+    let isListeningType = false;
+    if (item.loai === 'listening_fill') {
+        isListeningType = true;
+    } else if (typeof cleanKey === 'function') {
+        const loaiStr = item.loai ? cleanKey(item.loai) : '';
+        const chuDeStr = item.chuDe ? cleanKey(item.chuDe) : '';
+        if (loaiStr.includes('listening') || chuDeStr.includes('listening') || chuDeStr.includes('listu')) {
+            isListeningType = true;
+        }
+    }
+
+    const chuDeLower = (item.chuDe || '').toLowerCase();
+    const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
 
     let hasAnswered = false;
     const quizCards = document.querySelectorAll('.quiz-card');
@@ -317,32 +332,90 @@ window.speakQuestion = function(index) {
                       item._isAnswered;
     }
 
+    let questionText = item.passage || item.question || '';
+    let correctAnswerStr = '';
+    
+    let correctKeys = item._correctKeys || (typeof getCorrectKeys === 'function' ? getCorrectKeys(item) : []);
+    if (correctKeys.length > 0 && item[correctKeys[0]]) {
+        correctAnswerStr = typeof cleanOptionText === 'function' ? cleanOptionText(item[correctKeys[0]]) : item[correctKeys[0]].replace(/^[A-D][\.\)]\s*/, '');
+    } else if (item.correct) {
+        correctAnswerStr = typeof cleanOptionText === 'function' ? cleanOptionText(item.correct) : item.correct;
+    }
+
     let textToRead = '';
-    if (!hasAnswered) {
-        textToRead = item.question || '';
+    if (isListeningType) {
+        textToRead = questionText;
+        if (correctAnswerStr) {
+            if (textToRead.includes('___')) {
+                textToRead = textToRead.replace(/_{2,}/g, " " + correctAnswerStr + " ");
+            } else if (textToRead.includes('...')) {
+                textToRead = textToRead.replace(/\.{3,}/g, " " + correctAnswerStr + " ");
+            }
+        }
     } else {
-        const chuDeLower = (item.chuDe || '').toLowerCase();
-        const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
-        
-        if (isVietAnh && item.correct) {
-            textToRead = item.correct;
+        if (!hasAnswered) {
+            textToRead = questionText;
         } else {
-            let correctKeys = item._correctKeys || getCorrectKeys(item);
-            if (correctKeys.length > 0 && item[correctKeys[0]]) {
-                textToRead = cleanOptionText(item[correctKeys[0]]);
-            } else if (item.correct) {
-                textToRead = cleanOptionText(item.correct);
+            if (isVietAnh) {
+                textToRead = correctAnswerStr;
+            } else if (questionText.match(/_{2,}|\.{3,}/) && correctAnswerStr) {
+                textToRead = questionText.replace(/_{2,}|\.{3,}/g, " " + correctAnswerStr + " ");
             } else {
-                textToRead = item.question;
+                textToRead = questionText + ". " + correctAnswerStr;
             }
         }
     }
 
-    if (textToRead && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(textToRead);
-        utterance.lang = 'en-US';
-        window.speechSynthesis.speak(utterance);
+    // ==========================================
+    // 2. HÀM FALLBACK: ĐỌC BẰNG AI (NẾU MP3 LỖI/KHÔNG CÓ)
+    // ==========================================
+    const playTextToSpeech = () => {
+        if (textToRead && 'speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            let finalCleanText = textToRead.replace(/_/g, ' ')
+                                           .replace(/\s+/g, ' ')
+                                           .trim();
+                                           
+            const utterance = new SpeechSynthesisUtterance(finalCleanText);
+            utterance.lang = 'en-US';
+            utterance.rate = isListeningType ? 0.85 : 0.9; 
+            window.speechSynthesis.speak(utterance);
+        }
+    };
+
+    // ==========================================
+    // 3. XỬ LÝ PHÁT FILE MP3 TỪ EXCEL (CỘT Mp3)
+    // ==========================================
+    
+    // Lấy dữ liệu từ cột Mp3 (đề phòng trường hợp viết hoa/thường)
+    let audioUrl = item.Mp3 || item.mp3 || item.MP3 || ''; 
+    
+    if (audioUrl && typeof audioUrl === 'string' && audioUrl.trim() !== '') {
+        // CHUẨN HÓA LINK GOOGLE DRIVE ĐỂ TRÌNH DUYỆT CÓ THỂ ĐỌC ĐƯỢC
+        if (audioUrl.includes('drive.google.com') && audioUrl.includes('id=')) {
+            // Cắt lấy ID của file Google Drive
+            const urlParams = new URLSearchParams(audioUrl.substring(audioUrl.indexOf('?')));
+            const fileId = urlParams.get('id');
+            if (fileId) {
+                // Đổi thành link export=download để luồng Audio có thể stream
+                audioUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+            }
+        }
+        
+        // Dừng giọng AI nếu đang đọc
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        
+        const audio = new Audio(audioUrl);
+        audio.play().then(() => {
+            console.log("Đã phát file âm thanh:", audioUrl);
+        }).catch(error => {
+            // Nếu vẫn lỗi (do file Drive bị chặn quyền hoặc bị xóa), sẽ tự động chuyển sang đọc văn bản
+            console.warn("Không phát được file MP3, tự động chuyển sang đọc văn bản.", error);
+            playTextToSpeech();
+        });
+    } else {
+        // Không có cột Mp3 trống -> Gọi AI đọc chữ
+        playTextToSpeech();
     }
 };
 
@@ -371,9 +444,9 @@ function normalizeItem(item) {
             d: findKey(['d', 'dapan_d', 'dap an d', 'đáp án d', 'option_d']),
             correct: findKey(['correct', 'dapan_dung', 'dap an dung', 'đáp án đúng', 'dapandung', 'đáp_án_đúng', 'answer']),
             explanation: findKey(['explanation', 'giaithich', 'giai_thich', 'diễn giải', 'dien giai', 'giải thích']),
-            loai: findKey(['loai', 'loại', 'type']),
+            loai: findKey(['loai', 'loại', 'type', 'kieu', 'kiểu']),
             level: findKey(['level', 'cấp độ', 'cap do', 'muc do']),
-            passage: findKey(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'reading']),
+            passage: findKey(['passage', 'doanvan', 'đoạn văn', 'doan_van', 'đoạn_văn', 'noidungdoanvan', 'reading', 'audio']),
             made: findKey(['made', 'ma_de', 'mã đề', 'madề'])
         };
     }
@@ -396,7 +469,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const savedMa = localStorage.getItem('saved_maHS') || '';
     const input = document.getElementById('student-code');
     if (input && savedMa) input.value = savedMa;
-
     const startScreen = document.getElementById('start-screen');
     if (startScreen && !document.getElementById('dark-mode-toggle-btn')) {
         const btn = document.createElement('button');
@@ -407,7 +479,6 @@ window.addEventListener('DOMContentLoaded', () => {
         startScreen.insertBefore(btn, startScreen.firstChild);
     }
     if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
-
     if (startScreen && !document.getElementById('practice-wrong-btn')) {
         const wrongBtn = document.createElement('button');
         wrongBtn.id = 'practice-wrong-btn';
@@ -421,7 +492,6 @@ window.addEventListener('DOMContentLoaded', () => {
             startBtn.parentNode.insertBefore(wrongBtn, startBtn.nextSibling);
         }
     }
-
     if (savedMa) {
         window.loadData();
     }
@@ -450,13 +520,22 @@ window.updateMadeList = function() {
     const monSelect = document.getElementById('subject-select') ? document.getElementById('subject-select').value.trim() : '';
     const madeSelect = document.getElementById('made-select');
     if (!madeSelect || !monSelect) return;
-
     const cleanMonSelect = cleanKey(monSelect);
-    const mades = [...new Set(AppState.allQuizData
-        .filter(i => cleanKey(i.mon) === cleanMonSelect && i.made && String(i.made).trim() !== '')
-        .map(i => String(i.made).trim())
-    )].filter(Boolean);
 
+    // Thu thập danh sách MÃ ĐỀ và danh sách nội dung LIST_U1, LIST_U2,...
+    let madesList = [];
+    AppState.allQuizData.forEach(i => {
+        if (cleanKey(i.mon) === cleanMonSelect) {
+            if (i.made && String(i.made).trim() !== '') {
+                madesList.push(String(i.made).trim());
+            }
+            if (i.chuDe && (cleanKey(i.chuDe).startsWith('list') || cleanKey(i.chuDe).startsWith('made'))) {
+                madesList.push(String(i.chuDe).trim());
+            }
+        }
+    });
+
+    const mades = [...new Set(madesList)].filter(Boolean);
     madeSelect.innerHTML = '<option value="">-- Chọn mã đề --</option>' + mades.map(m => '<option value="' + escapeHTML(m) + '">Mã đề: ' + escapeHTML(m) + '</option>').join('');
 };
 
@@ -465,29 +544,25 @@ window.updateTopicList = function() {
     const maHS = document.getElementById('student-code').value.trim();
     const container = document.getElementById('topic-container');
     if (!container || !monSelect) return;
-
     const cleanMonSelect = cleanKey(monSelect);
-
     const allowed = AppState.userPermissions
         .filter(p => String(p.maHS).trim() === maHS && cleanKey(p.mon) === cleanMonSelect)
         .map(p => String(p.chuDe).trim());
-
     const topics = [...new Set(AppState.allQuizData
         .filter(i => cleanKey(i.mon) === cleanMonSelect && i.question !== '')
         .map(i => i.chuDe))].filter(Boolean);
-
     if (topics.length === 0) {
         container.innerHTML = "Không tìm thấy chủ đề cho môn này.";
         return;
     }
 
-    const authorizedTopics = topics.filter(topic => allowed.includes(topic));
+    const hasSpecificPerms = AppState.userPermissions.some(p => String(p.maHS).trim() === maHS && cleanKey(p.mon) === cleanMonSelect);
+    const authorizedTopics = hasSpecificPerms ? topics.filter(topic => allowed.includes(topic)) : topics;
 
     if (authorizedTopics.length === 0) {
         container.innerHTML = '<i style="color: #d9534f;">Bạn chưa được phân quyền chủ đề nào cho môn này.</i>';
         return;
     }
-
     container.innerHTML = authorizedTopics.map(topic => {
         return '<label style="display:block; margin:8px 0; font-size: 1.05em; cursor: pointer;"><input type="checkbox" name="topic" value="' + escapeHTML(topic) + '" onchange="window.saveUserSelections()" checked style="width: 18px; height: 18px; vertical-align: middle; margin-right: 6px;"> ' + escapeHTML(topic) + '</label>';
     }).join('');
@@ -522,10 +597,8 @@ window.loadData = function() {
         localStorage.removeItem('saved_mon');
     }
     localStorage.setItem('saved_maHS', maHS);
-
     const container = document.getElementById('topic-container');
     if (container) container.innerHTML = "Đang tải dữ liệu...";
-
     const script = document.createElement('script');
     script.src = API_URL + '?ma=' + encodeURIComponent(maHS) + '&callback=handleQuizData';
     script.onerror = () => { 
@@ -539,40 +612,32 @@ window.loadData = function() {
 window.handleQuizData = function(data) {
     if (data && !data.error && data.questions && data.questions.length > 0) {
         let lastMon = '', lastChuDe = '', lastLevel = '', lastLoai = '', lastPassage = '', lastMade = '';
-
         AppState.allQuizData = (data.questions || []).map(rawItem => {
             let item = normalizeItem(rawItem);
             if (!item) return null;
-
             if (item.mon) {
                 lastMon = standardizeSubject(item.mon);
                 lastChuDe = ''; lastLevel = ''; lastLoai = ''; lastPassage = ''; lastMade = '';
             }
             item.mon = lastMon;
-
             if (item.made) {
                 if (item.made !== lastMade) lastPassage = '';
                 lastMade = item.made;
             } else if (lastMade) {
                 item.made = lastMade;
             }
-
             if (item.chuDe) lastChuDe = item.chuDe; else item.chuDe = lastChuDe;
             if (item.level) lastLevel = item.level; else if (lastLevel) item.level = lastLevel;
             if (item.loai) lastLoai = item.loai; else if (lastLoai) item.loai = lastLoai;
             if (item.passage) lastPassage = item.passage; else if (lastPassage) item.passage = lastPassage;
-
             return item;
         }).filter(item => item && item.question !== '' && item.mon !== '' && cleanKey(item.mon) !== 'id');
-
         AppState.userPermissions = (data.permissions || []).map(p => ({
             maHS: String(p.maHS || p[0] || '').trim(),
             mon: standardizeSubject(String(p.mon || p[1] || '').trim()),
             chuDe: String(p.chuDe || p[2] || '').trim()
         })).filter(p => p.chuDe !== '');
-
         AppState.rankings = [];
-
         if (data.rankings && Array.isArray(data.rankings)) {
             data.rankings.forEach(raw => {
                 if (!raw) return;
@@ -607,7 +672,6 @@ window.handleQuizData = function(data) {
                         date: String(getVal(['date', 'ngay', 'ngày'])).trim()
                     };
                 }
-
                 if (item && item.name !== '') {
                     let lowerName = item.name.toLowerCase();
                     let lowerSubj = cleanKey(item.subject);
@@ -618,7 +682,6 @@ window.handleQuizData = function(data) {
                 }
             });
         }
-
         window.initInterface();
     }
 };
@@ -656,12 +719,10 @@ window.renderLeaderboard = function(subjectFilter = null) {
             studentSubjects[key] = { name: name, subject: subj };
         }
     });
-
     let kimCuongList = [];
     let vangList = [];
     let bacList = [];
     let dongList = [];
-
     for (let key in studentSubjects) {
         let st = studentSubjects[key];
         if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
@@ -671,26 +732,20 @@ window.renderLeaderboard = function(subjectFilter = null) {
             let rSubj = cleanKey(r.subject || '');
             return rName === st.name.toLowerCase() && rSubj === cleanKey(st.subject);
         });
-
         if (attempts.length === 0) continue;
-
         attempts.forEach(a => {
             let s = a.score !== undefined ? a.score : 0;
             a._parsedScore = Number(s) || 0;
         });
-
         let bestScore = Math.max(...attempts.map(a => a._parsedScore));
         let latestAttempt = attempts[attempts.length - 1];
-
         let hasExplicitLevel = attempts.some(a => a.level && a.level.trim() !== '');
-
         let record = {
             name: st.name,
             subject: st.subject,
             score: bestScore,
             date: latestAttempt.date || ''
         };
-
         if (hasExplicitLevel) {
             attempts.forEach(a => {
                 let lvl = String(a.level || '').trim();
@@ -704,7 +759,6 @@ window.renderLeaderboard = function(subjectFilter = null) {
             let count10 = attempts.filter(a => a._parsedScore === 10).length;
             let count9 = attempts.filter(a => a._parsedScore >= 9).length;
             let count8 = attempts.filter(a => a._parsedScore >= 8).length;
-
             let sortedAttempts = [...attempts].sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
             let isKimCuong = false;
             if (sortedAttempts.length >= 3) {
@@ -715,7 +769,6 @@ window.renderLeaderboard = function(subjectFilter = null) {
                     let t1 = extractTopicFlexible(sortedAttempts[i]);
                     let t2 = extractTopicFlexible(sortedAttempts[i+1]);
                     let t3 = extractTopicFlexible(sortedAttempts[i+2]);
-
                     if (s1 === 10 && s2 === 10 && s3 === 10) {
                         if (!t1 || !t2 || !t3 || (t1 !== t2 && t2 !== t3 && t1 !== t3)) {
                             isKimCuong = true;
@@ -724,19 +777,16 @@ window.renderLeaderboard = function(subjectFilter = null) {
                     }
                 }
             }
-
             if (isKimCuong) kimCuongList.push(record);
             if (count10 > 0) vangList.push(record);
             if (count9 >= 2) bacList.push(record);
             if (count8 >= 2) dongList.push(record);
         }
     }
-
     kimCuongList.sort((a, b) => b.score - a.score);
     vangList.sort((a, b) => b.score - a.score);
     bacList.sort((a, b) => b.score - a.score);
     dongList.sort((a, b) => b.score - a.score);
-
     function buildGroupHtml(title, color, listItems) {
         if (listItems.length === 0) {
             return `<div style="margin-bottom: 12px; font-size: 1.02em;"><b>${title}:</b> <span style="color: #888; font-style: italic;">Chưa có học sinh đạt chuẩn</span></div>`;
@@ -749,14 +799,12 @@ window.renderLeaderboard = function(subjectFilter = null) {
                     <ul style="margin: 6px 0 0 20px; padding: 0; font-size: 1.05em;">${itemsHtml}</ul>
                 </div>`;
     }
-
     let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
     html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList);
     html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList);
     html += buildGroupHtml('🥈 Bạc (Có ít nhất 1 lần đạt 9 điểm trở lên và nhỏ hơn 10)', '#6c757d', bacList);
     html += buildGroupHtml('🥉 Đồng (Có ít nhất 1 lần đạt 8 điểm trở lên và nhỏ hơn 9)', '#cd7f32', dongList);
     html += '</div>';
-
     list.innerHTML = html;
 };
 
@@ -785,7 +833,6 @@ function getCorrectKeys(item) {
         }
     }
     if (keys.length > 0) return [...new Set(keys)];
-
     let parts = raw.split(/[\s,;]+/);
     for (let p of parts) {
         let upper = p.toUpperCase();
@@ -803,38 +850,39 @@ function getCorrectKeys(item) {
 }
 
 window.startQuiz = function() {
-    // Kiểm tra môn học đang chọn để ẩn/hiện nút phù hợp trên header
     const subjectSelect = document.getElementById('subject-select');
     const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
-
+    // 1. Kiểm tra chọn môn học
+    const mon = subjectSelect ? subjectSelect.value : '';
+    if (!mon) {
+        return alert("Vui lòng chọn môn học trước khi bắt đầu!");
+    }
+    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
+    
+    // 2. Ẩn / Hiện các công cụ tương ứng với môn học (Toán / Tiếng Anh)
     const btnCalc = document.getElementById('btn-calc');
     const btnDict = document.getElementById('btn-dict');
     const btnVerbs = document.getElementById('btn-verbs');
-
-    // Kiểm tra nếu là môn Toán (có chứa chữ 'toan' hoặc tương tự)
-    if (selectedSubject.includes('toan') || selectedSubject.includes('math')) {
-        if (btnCalc) btnCalc.style.display = 'block';
-        if (btnDict) btnDict.style.display = 'none';
-        if (btnVerbs) btnVerbs.style.display = 'none';
-    } else {
-        // Mặc định hoặc môn Tiếng Anh
-        if (btnCalc) btnCalc.style.display = 'none';
-        if (btnDict) btnDict.style.display = 'block';
-        if (btnVerbs) btnVerbs.style.display = 'block';
+    const isMath = selectedSubject.includes('toán') || selectedSubject.includes('math');
+    const isEnglish = selectedSubject.includes('anh') || selectedSubject.includes('english');
+    if (btnCalc && btnDict && btnVerbs) {
+        if (isMath) {
+            btnCalc.style.display = 'block';   // Hiện máy tính
+            btnDict.style.display = 'none';    // Ẩn tra từ
+            btnVerbs.style.display = 'none';   // Ẩn động từ bất quy tắc
+        } else if (isEnglish) {
+            btnCalc.style.display = 'none';    // Ẩn máy tính
+            btnDict.style.display = 'block';   // Hiện tra từ
+            btnVerbs.style.display = 'block';  // Hiện động từ bất quy tắc
+        }
     }
 
-    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
-    if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
-
-    const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
-    
+    // 3. Kiểm tra Mã đề (MADE) - Khóa 6 tiếng nếu từng đạt điểm 10
     const toggleMade = document.getElementById('toggle-made');
     const selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
-    
     if (selectedMade) {
         const tenPointTimeKey = 'made_10_time_' + maHS + '_' + mon + '_' + selectedMade;
         const lastTenPointTime = localStorage.getItem(tenPointTimeKey);
-        
         if (lastTenPointTime) {
             const elapsedHours = (Date.now() - Number(lastTenPointTime)) / (1000 * 60 * 60);
             if (elapsedHours < 6) {
@@ -844,13 +892,12 @@ window.startQuiz = function() {
         }
     }
 
+    // 4. Kiểm tra điều kiện mở Level 2 & Level 3
     const levelSelect = document.getElementById('level-select');
     const selectedLevel = levelSelect ? levelSelect.value : '';
     const selectedTopics = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value);
-
     if (selectedLevel === 'Level 2' || selectedLevel === 'Level 3' || selectedLevel === '2' || selectedLevel === '3' || selectedLevel.includes('2') || selectedLevel.includes('3')) {
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
-
         for (let topic of selectedTopics) {
             let topicAttempts = AppState.rankings.filter(r => 
                 String(r.name).trim().toLowerCase() === maHS.toLowerCase() && 
@@ -858,7 +905,6 @@ window.startQuiz = function() {
                 (String(r.level || '').includes('1')) &&
                 (cleanKey(r.chuDe || '') === cleanKey(topic) || !r.chuDe)
             );
-
             let hasThreeConsecutive = false;
             if (topicAttempts.length >= 3) {
                 for (let i = 0; i <= topicAttempts.length - 3; i++) {
@@ -871,13 +917,11 @@ window.startQuiz = function() {
                     }
                 }
             }
-
             if (!hasThreeConsecutive) {
                 return alert(`Bạn chưa đạt 3 lần liên tiếp từ 8 điểm trở lên ở Level 1 đối với chủ đề "${topic}" nên chưa được phép chọn mức 2, 3!`);
             }
         }
     }
-
     window.saveUserSelections();
 
     let rawSelectedQuestions = [];
@@ -885,30 +929,37 @@ window.startQuiz = function() {
     const cleanM = standardizeSubject(mon);
 
     if (selectedMade) {
-        rawSelectedQuestions = AppState.allQuizData.filter(i => cleanKey(i.mon) === cleanKey(mon) && String(i.made).trim() === selectedMade && i.question !== '');
+        rawSelectedQuestions = AppState.allQuizData.filter(i => 
+            cleanKey(i.mon) === cleanKey(mon) && 
+            (String(i.made).trim() === selectedMade || String(i.chuDe).trim() === selectedMade) && 
+            i.question !== ''
+        );
         totalSeconds = 45 * 60;
     } else {
         if (!selectedTopics.length) return alert("Vui lòng chọn chủ đề!");
-
         const isIrregularVerbs = selectedTopics.some(t => 
             cleanKey(t).includes('dongtubatquytac') || 
             t.toLowerCase().includes('động từ bất quy tắc')
         );
-
         const isPreposition = selectedTopics.some(t => 
             cleanKey(t).includes('preposition') || 
             t.toLowerCase().includes('giới từ')
         );
+        const isListeningFill = selectedTopics.some(t => 
+            cleanKey(t).includes('listeningfill') || 
+            cleanKey(t).includes('listening') ||
+            cleanKey(t).includes('listu') ||
+            t.toLowerCase().includes('listening_fill') ||
+            t.toLowerCase().includes('nghe')
+        );
 
         let storedWrongs = getStoredWrongQuestions(maHS, mon);
         let targetCount = 20;
-
         let topicPool = AppState.allQuizData.filter(i => 
             cleanKey(i.mon) === cleanKey(mon) && 
             selectedTopics.includes(i.chuDe) && 
             i.question !== ''
         );
-
         let uniquePool = [];
         let seenQ = new Set();
         for (let item of topicPool) {
@@ -921,7 +972,6 @@ window.startQuiz = function() {
         if (isIrregularVerbs) {
             targetCount = 10;
             totalSeconds = 10 * 60;
-
             let verbMap = {};
             uniquePool.forEach(item => {
                 let verb = '';
@@ -939,7 +989,6 @@ window.startQuiz = function() {
                         verb = cleanQ || item.question.toLowerCase();
                     }
                 }
-
                 if (!verbMap[verb]) {
                     verbMap[verb] = { textQ: [], mcqQ: [] };
                 }
@@ -950,11 +999,9 @@ window.startQuiz = function() {
                     verbMap[verb].mcqQ.push(item);
                 }
             });
-
             let finalSelected = [];
             let verbs = Object.keys(verbMap);
             verbs = shuffleArray(verbs);
-
             for (let v of verbs) {
                 if (finalSelected.length >= 10) break;
                 let group = verbMap[v];
@@ -969,10 +1016,17 @@ window.startQuiz = function() {
         } else if (isPreposition) {
             targetCount = 10;
             totalSeconds = 5 * 60;
-
             let wrongPool = uniquePool.filter(i => storedWrongs.some(w => w.question === i.question));
             let normalPool = shuffleArray(uniquePool.filter(i => !storedWrongs.some(w => w.question === i.question)));
-
+            rawSelectedQuestions = [...wrongPool, ...normalPool];
+            if (rawSelectedQuestions.length > targetCount) {
+                rawSelectedQuestions = rawSelectedQuestions.slice(0, targetCount);
+            }
+        } else if (isListeningFill) {
+            targetCount = 10;
+            totalSeconds = 15 * 60;
+            let wrongPool = uniquePool.filter(i => storedWrongs.some(w => w.question === i.question));
+            let normalPool = shuffleArray(uniquePool.filter(i => !storedWrongs.some(w => w.question === i.question)));
             rawSelectedQuestions = [...wrongPool, ...normalPool];
             if (rawSelectedQuestions.length > targetCount) {
                 rawSelectedQuestions = rawSelectedQuestions.slice(0, targetCount);
@@ -988,39 +1042,28 @@ window.startQuiz = function() {
                 targetCount = 10;
                 totalSeconds = 15 * 60;
             }
-
             let wrongPool = uniquePool.filter(i => storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe));
             let normalPool = shuffleArray(uniquePool.filter(i => !storedWrongs.some(w => w.question === i.question && w.chuDe === i.chuDe)));
-
             rawSelectedQuestions = [...wrongPool, ...normalPool];
-
             if (rawSelectedQuestions.length > targetCount) {
                 rawSelectedQuestions = rawSelectedQuestions.slice(0, targetCount);
             }
         }
     }
-
     if (rawSelectedQuestions.length === 0) return alert("Không tìm thấy câu hỏi phù hợp!");
-
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let correctKeys = getCorrectKeys(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
         validKeys = shuffleArray(validKeys);
-
         return { ...item, _shuffledKeys: validKeys, _correctKeys: correctKeys };
     });
-
     AppState.correctCount = 0;
     AppState.wrongCount = 0;
-
     const startScreen = document.getElementById('start-screen');
     if (startScreen) startScreen.style.display = 'none';
-
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'block';
-
     window.addEventListener('beforeunload', handleBeforeUnload);
-
     updateScoreDisplay();
     window.renderQuiz();
     window.startTimerTotal(totalSeconds);
@@ -1029,43 +1072,32 @@ window.startQuiz = function() {
 window.startWrongQuiz = function() {
     const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     if (!mon) return alert("Vui lòng chọn môn học để ôn tập câu sai!");
-
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     let storedWrongs = getStoredWrongQuestions(maHS, mon);
-
     if (storedWrongs.length === 0) {
         return alert("Tuyệt vời! Bạn chưa có câu hỏi sai nào cần luyện tập lại trong môn này.");
     }
-
     let rawSelectedQuestions = AppState.allQuizData.filter(i => 
         cleanKey(i.mon) === cleanKey(mon) && 
         storedWrongs.some(w => w.question === i.question) && 
         i.question !== ''
     );
-
     if (rawSelectedQuestions.length === 0) {
         return alert("Không tìm thấy dữ liệu câu sai tương ứng trong hệ thống!");
     }
-
     AppState.currentQuizData = rawSelectedQuestions.map(item => {
         let correctKeys = getCorrectKeys(item);
         let validKeys = ['a', 'b', 'c', 'd'].filter(k => item[k] !== '');
         validKeys = shuffleArray(validKeys);
-
         return { ...item, _shuffledKeys: validKeys, _correctKeys: correctKeys };
     });
-
     AppState.correctCount = 0;
     AppState.wrongCount = 0;
-
     const startScreen = document.getElementById('start-screen');
     if (startScreen) startScreen.style.display = 'none';
-
     const quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'block';
-
     window.addEventListener('beforeunload', handleBeforeUnload);
-
     updateScoreDisplay();
     window.renderQuiz();
     window.startTimerTotal(10 * 60);
@@ -1074,17 +1106,14 @@ window.startWrongQuiz = function() {
 window.renderQuiz = function() {
     const container = document.getElementById('quiz');
     if (!container) return;
-
     let renderedPassages = new Set();
     let html = '';
-
     AppState.currentQuizData.forEach((item, index) => {
         let passage = item.passage;
         if (passage && passage.trim() !== '' && !renderedPassages.has(passage)) {
             renderedPassages.add(passage);
-            html += '<div class="passage-box"><div class="passage-tag">Đoạn văn đọc hiểu</div><div style="white-space: pre-line; margin-top: 10px;">' + escapeHTML(passage) + '</div></div>';
+            html += '<div class="passage-box"><div class="passage-tag">🎧 Đoạn văn / Bài nghe đọc hiểu</div><div style="white-space: pre-line; margin-top: 10px;">' + escapeHTML(passage) + '</div></div>';
         }
-
         let hasOptions = item.a || item.b || item.c || item.d;
         let bodyHtml = '';
         let correctKeys = item._correctKeys || [];
@@ -1105,21 +1134,29 @@ window.renderQuiz = function() {
                     return '<div class="option-box" onclick="window.selectAnswer(' + index + ', \'' + optKey + '\')" id="q' + index + '-opt-' + optKey + '"><b>' + displayLetter + '.</b> ' + escapeHTML(cleanText) + '</div>';
                 }
             }).join('');
-
             if (isMultiChoice) {
                 bodyHtml += '<button type="button" onclick="window.submitMultiAnswer(' + index + ')" id="multi-btn-' + index + '" style="margin-top: 12px; background: #007bff; color: white; border: none; padding: 12px 22px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.05em;">Xác nhận đáp án</button>';
             }
         } else {
-            bodyHtml = '<div style="margin-top: 12px;"><input type="text" id="text-input-' + index + '" placeholder="Nhập đáp án..."><button type="button" onclick="window.submitTextAnswer(' + index + ')" style="background: #007bff; color: white; border: none; padding: 12px 22px; border-radius: 8px; font-weight: bold; cursor: pointer; display: inline-block; font-size: 1.05em;">Gửi đáp án</button></div>';
+            bodyHtml = '<div style="margin-top: 12px;"><input type="text" id="text-input-' + index + '" placeholder="Nhập từ/cụm từ điền vào..."><button type="button" onclick="window.submitTextAnswer(' + index + ')" style="background: #007bff; color: white; border: none; padding: 12px 22px; border-radius: 8px; font-weight: bold; cursor: pointer; display: inline-block; font-size: 1.05em;">Gửi đáp án</button></div>';
         }
 
         const cleanMon = cleanKey(item.mon);
         const isMathOrVietnamese = cleanMon.includes('toan') || cleanMon.includes('math') || cleanMon.includes('tiengviet') || cleanMon.includes('tv');
-        let speechBtnHtml = isMathOrVietnamese ? '' : '<button type="button" class="speech-btn" onclick="window.speakQuestion(' + index + ')">🔊 Nghe</button>';
+        const isListening = item.loai === 'listening_fill' || 
+                            cleanKey(item.loai).includes('listening') || 
+                            cleanKey(item.chuDe).includes('listening') ||
+                            cleanKey(item.chuDe).includes('listu');
 
-        html += '<div class="quiz-card" id="question-card-' + index + '"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"><div style="font-weight: bold; color: #540606; font-size: 1.1em;">Câu ' + (index + 1) + ':</div>' + speechBtnHtml + '</div><div style="margin-bottom: 15px; font-weight: 600; white-space: pre-line; line-height: 1.6; font-size: 1.1em;">' + escapeHTML(item.question) + '</div>' + bodyHtml + '<div class="explanation-box" id="explanation-' + index + '"><b>💡 Giải thích:</b> ' + escapeHTML(item.explanation || 'Không có giải thích.') + '</div></div>';
+        let speechBtnHtml = (isMathOrVietnamese && !isListening) ? '' : '<button type="button" class="speech-btn" onclick="window.speakQuestion(' + index + ')">🔊 Nghe câu hỏi</button>';
+        
+        let loaiBadge = '';
+        if (item.loai === 'listening_fill' || cleanKey(item.loai).includes('listeningfill')) {
+            loaiBadge = '<span style="background: #17a2b8; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; margin-left: 8px;">🎧 Listening Fill</span>';
+        }
+
+        html += '<div class="quiz-card" id="question-card-' + index + '"><div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;"><div style="font-weight: bold; color: #540606; font-size: 1.1em;">Câu ' + (index + 1) + ':' + loaiBadge + '</div>' + speechBtnHtml + '</div><div style="margin-bottom: 15px; font-weight: 600; white-space: pre-line; line-height: 1.6; font-size: 1.1em;">' + escapeHTML(item.question) + '</div>' + bodyHtml + '<div class="explanation-box" id="explanation-' + index + '"><b>💡 Giải thích:</b> ' + escapeHTML(item.explanation || 'Không có giải thích.') + '</div></div>';
     });
-
     container.innerHTML = html;
 };
 
@@ -1128,14 +1165,11 @@ window.selectAnswer = function(index, optKey) {
     if (item._isAnswered) return;
     item._isAnswered = true;
     item._userAnswer = [optKey];
-
     let correctKeys = item._correctKeys || [];
     let correctKey = correctKeys[0] || '';
     let isCorrect = (optKey.toLowerCase() === correctKey.toLowerCase());
-
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     let storedWrongs = getStoredWrongQuestions(maHS, item.mon);
-
     if (isCorrect) {
         AppState.correctCount++;
         const box = document.getElementById('q' + index + '-opt-' + optKey);
@@ -1155,12 +1189,10 @@ window.selectAnswer = function(index, optKey) {
     }
     saveStoredWrongQuestions(maHS, item.mon, storedWrongs);
     updateScoreDisplay();
-
     item._shuffledKeys.forEach(k => {
         const el = document.getElementById('q' + index + '-opt-' + k);
         if (el) el.style.pointerEvents = 'none';
     });
-
     const expBox = document.getElementById('explanation-' + index);
     if (expBox) expBox.style.display = 'block';
 };
@@ -1168,41 +1200,32 @@ window.selectAnswer = function(index, optKey) {
 window.submitMultiAnswer = function(index) {
     const item = AppState.currentQuizData[index];
     if (item._isAnswered) return;
-
     const checkboxes = document.querySelectorAll('input[name="multi-q' + index + '"]');
     let userSelected = [];
     checkboxes.forEach(cb => {
         if (cb.checked) userSelected.push(cb.value);
     });
-
     if (userSelected.length === 0) {
         return alert("Vui lòng chọn ít nhất một đáp án!");
     }
-
     item._isAnswered = true;
     item._userAnswer = userSelected;
-
     let correctKeys = item._correctKeys || [];
     let isCorrect = userSelected.length === correctKeys.length && userSelected.every(k => correctKeys.includes(k));
-
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     let storedWrongs = getStoredWrongQuestions(maHS, item.mon);
-
     item._shuffledKeys.forEach(k => {
         const box = document.getElementById('q' + index + '-opt-' + k);
         const cb = box ? box.querySelector('input') : null;
         if (cb) cb.disabled = true;
-
         if (correctKeys.includes(k)) {
             if (box) { box.style.background = '#d4edda'; box.style.borderColor = '#28a745'; }
         } else if (userSelected.includes(k)) {
             if (box) { box.style.background = '#f8d7da'; box.style.borderColor = '#dc3545'; }
         }
     });
-
     const submitBtn = document.getElementById('multi-btn-' + index);
     if (submitBtn) submitBtn.disabled = true;
-
     if (isCorrect) {
         AppState.correctCount++;
         storedWrongs = storedWrongs.filter(w => w.question !== item.question);
@@ -1214,7 +1237,6 @@ window.submitMultiAnswer = function(index) {
     }
     saveStoredWrongQuestions(maHS, item.mon, storedWrongs);
     updateScoreDisplay();
-
     const expBox = document.getElementById('explanation-' + index);
     if (expBox) expBox.style.display = 'block';
 };
@@ -1222,21 +1244,25 @@ window.submitMultiAnswer = function(index) {
 window.submitTextAnswer = function(index) {
     const item = AppState.currentQuizData[index];
     if (item._isAnswered) return;
-
     const inputEl = document.getElementById('text-input-' + index);
     if (!inputEl) return;
     const userVal = inputEl.value.trim();
     if (!userVal) return alert("Vui lòng nhập đáp án!");
-
     item._isAnswered = true;
     item._userAnswer = [userVal];
-
     let correctVal = String(item.correct || '').trim();
-    let isCorrect = cleanKey(userVal) === cleanKey(correctVal);
+    
+    // So sánh đáp án linh hoạt (hỗ trợ cả đáp án phân cách bằng dấu /)
+    let isCorrect = cleanKey(userVal) === cleanKey(correctVal) || userVal.toLowerCase() === correctVal.toLowerCase();
+    if (!isCorrect && correctVal.includes('/')) {
+        let possibleAnswers = correctVal.split('/').map(a => cleanKey(a));
+        if (possibleAnswers.includes(cleanKey(userVal))) {
+            isCorrect = true;
+        }
+    }
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     let storedWrongs = getStoredWrongQuestions(maHS, item.mon);
-
     if (isCorrect) {
         AppState.correctCount++;
         inputEl.style.background = '#d4edda';
@@ -1252,11 +1278,9 @@ window.submitTextAnswer = function(index) {
     }
     saveStoredWrongQuestions(maHS, item.mon, storedWrongs);
     updateScoreDisplay();
-
     inputEl.disabled = true;
     const btn = inputEl.nextElementSibling;
     if (btn) btn.disabled = true;
-
     const expBox = document.getElementById('explanation-' + index);
     if (expBox) {
         expBox.innerHTML = '<b>💡 Giải thích:</b> Đáp án đúng là: <b>' + escapeHTML(correctVal) + '</b>. ' + escapeHTML(item.explanation || '');
@@ -1288,23 +1312,18 @@ window.submitQuiz = function() {
     if (typeof handleBeforeUnload !== 'undefined') {
         window.removeEventListener('beforeunload', handleBeforeUnload);
     }
-
     let maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
     let mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
     let levelSelect = document.getElementById('level-select');
     let level = levelSelect ? levelSelect.value : '';
     let selectedTopicsStr = Array.from(document.querySelectorAll('input[name="topic"]:checked')).map(cb => cb.value).join(', ');
-
     const toggleMade = document.getElementById('toggle-made');
     let selectedMade = (toggleMade && toggleMade.checked && document.getElementById('made-select')) ? document.getElementById('made-select').value.trim() : '';
-
     let totalQuestions = AppState.currentQuizData.length;
     let score = Math.round((AppState.correctCount / totalQuestions) * 10 * 10) / 10;
-
     if (selectedMade && score === 10) {
         localStorage.setItem('made_10_time_' + maHS + '_' + mon + '_' + selectedMade, Date.now());
     }
-
     let details = AppState.currentQuizData.map((item, index) => {
         let hasOptions = item.a || item.b || item.c || item.d;
         let userAnswerText = 'Chưa trả lời';
@@ -1312,7 +1331,6 @@ window.submitQuiz = function() {
         let isCorrect = false;
         let correctKeys = item._correctKeys || [];
         let isMultiChoice = correctKeys.length > 1;
-
         if (hasOptions) {
             if (isMultiChoice) {
                 correctAnswerText = correctKeys.map(k => k.toUpperCase() + '. ' + cleanOptionText(item[k])).join('; ');
@@ -1333,10 +1351,9 @@ window.submitQuiz = function() {
             correctAnswerText = item.correct || '';
             if (item._userAnswer && item._userAnswer.length > 0) {
                 userAnswerText = item._userAnswer[0];
-                isCorrect = (String(userAnswerText).trim().toLowerCase() === String(correctAnswerText).trim().toLowerCase());
+                isCorrect = (cleanKey(userAnswerText) === cleanKey(correctAnswerText));
             }
         }
-
         return {
             index: index + 1,
             question: item.question || ('Câu ' + (index + 1)),
@@ -1345,7 +1362,6 @@ window.submitQuiz = function() {
             isCorrect: isCorrect
         };
     });
-
     if (maHS && mon) {
         fetch(API_URL, {
             method: 'POST',
@@ -1362,10 +1378,8 @@ window.submitQuiz = function() {
             })
         }).catch(err => console.log('Lỗi gửi kết quả:', err));
     }
-
     let quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'none';
-
     let resultContainer = document.getElementById('result-container');
     if (!resultContainer) {
         resultContainer = document.createElement('div');
@@ -1373,7 +1387,6 @@ window.submitQuiz = function() {
         resultContainer.className = 'container';
         document.body.appendChild(resultContainer);
     }
-
     resultContainer.innerHTML = '<h2 style="text-align: center; color: #540606; font-size: 1.6em;">Kết Quả Bài Làm</h2>' +
         '<p style="font-size: 1.2em; text-align: center;">Số câu hỏi đúng: <b>' + AppState.correctCount + ' / ' + totalQuestions + '</b></p>' +
         '<p style="font-size: 1.4em; text-align: center; font-weight: bold;">Điểm số: ' + score + ' đ</p>' +
@@ -1387,9 +1400,7 @@ window.submitQuiz = function() {
 window.viewReviewDetails = function() {
     const box = document.getElementById('review-detail-box');
     if (!box) return;
-
     let html = '<h3 style="color: #540606; border-bottom: 2px solid #540606; padding-bottom: 8px; font-size: 1.3em;">Chi Tiết Bài Làm</h3>';
-
     AppState.currentQuizData.forEach((item, index) => {
         let hasOptions = item.a || item.b || item.c || item.d;
         let userAnswerText = 'Chưa trả lời';
@@ -1397,7 +1408,6 @@ window.viewReviewDetails = function() {
         let isCorrect = false;
         let correctKeys = item._correctKeys || [];
         let isMultiChoice = correctKeys.length > 1;
-
         if (hasOptions) {
             if (isMultiChoice) {
                 correctAnswerText = correctKeys.map(k => k.toUpperCase() + '. ' + cleanOptionText(item[k])).join('; ');
@@ -1422,10 +1432,8 @@ window.viewReviewDetails = function() {
                 isCorrect = (cleanKey(userAnswerText) === cleanKey(correctAnswerText));
             }
         }
-
         let statusColor = isCorrect ? 'green' : 'red';
         let statusText = isCorrect ? '✅ Đúng' : '❌ Sai';
-
         html += '<div style="background: #fff; border: 1px solid #ddd; padding: 14px; border-radius: 8px; margin-bottom: 12px; font-size: 1.05em;">' +
             '<div style="font-weight: bold; margin-bottom: 6px;">Câu ' + (index + 1) + ': ' + escapeHTML(item.question) + '</div>' +
             '<div style="font-size: 1em; color: ' + statusColor + '; font-weight: bold; margin-bottom: 4px;">Trạng thái: ' + statusText + '</div>' +
@@ -1433,7 +1441,6 @@ window.viewReviewDetails = function() {
             '<div style="font-size: 1em; color: #28a745;">Đáp án đúng: <b>' + escapeHTML(correctAnswerText) + '</b></div>' +
             '</div>';
     });
-
     box.innerHTML = html;
 };
 
@@ -1582,12 +1589,10 @@ window.closeIrregularVerbsModal = function() {
 window.renderIrregularVerbsTable = function(dataArray) {
     const resultList = document.getElementById('iv-result-list');
     if (!resultList) return;
-
     if (dataArray.length === 0) {
         resultList.innerHTML = '<div style="text-align: center; color: #888; padding: 15px;">Không tìm thấy động từ phù hợp.</div>';
         return;
     }
-
     let html = '<table style="width: 100%; border-collapse: collapse; font-size: 1.02em;">';
     html += '<tr style="background: #540606; color: white; text-align: left;">' +
             '<th style="padding: 10px; border: 1px solid #ddd;">V1 (Base)</th>' +
@@ -1595,7 +1600,6 @@ window.renderIrregularVerbsTable = function(dataArray) {
             '<th style="padding: 10px; border: 1px solid #ddd;">V3 (Participle)</th>' +
             '<th style="padding: 10px; border: 1px solid #ddd;">Ý nghĩa</th>' +
             '</tr>';
-
     dataArray.forEach((item, index) => {
         let bg = index % 2 === 0 ? '#ffffff' : '#f1f3f5';
         html += `<tr style="background: ${bg};">` +
@@ -1622,12 +1626,10 @@ window.filterIrregularVerbs = function() {
     const input = document.getElementById('iv-search-input');
     if (!input) return;
     let keyword = removeDiacritics(input.value.trim().toLowerCase());
-
     if (!keyword) {
         window.renderIrregularVerbsTable(IRREGULAR_VERBS_DATA);
         return;
     }
-
     let filtered = IRREGULAR_VERBS_DATA.filter(item => 
         removeDiacritics(item.v1.toLowerCase()).includes(keyword) ||
         removeDiacritics(item.v2.toLowerCase()).includes(keyword) ||
@@ -1637,7 +1639,6 @@ window.filterIrregularVerbs = function() {
         (item.ipa2 && item.ipa2.toLowerCase().includes(keyword)) ||
         (item.ipa3 && item.ipa3.toLowerCase().includes(keyword))
     );
-
     window.renderIrregularVerbsTable(filtered);
 };
 
@@ -1671,7 +1672,6 @@ window.calcClear = function() {
 window.calcCalculate = function() {
     const display = document.getElementById('calc-display');
     if (!display || !display.value.trim()) return;
-
     try {
         let expression = display.value.replace(/×/g, '*').replace(/÷/g, '/');
         let result = new Function(`return ${expression}`)();
@@ -1685,3 +1685,87 @@ window.calcCalculate = function() {
         display.value = 'Lỗi';
     }
 };
+
+document.addEventListener('DOMContentLoaded', function() {
+    const btnCalc = document.getElementById('btn-calc');
+    if (btnCalc) {
+        btnCalc.addEventListener('click', window.openCalculatorModal);
+    }
+});
+// Biến lưu trữ đối tượng Audio đang phát
+let currentAudio = null;
+
+/**
+ * 1. Hàm tự động chuẩn hóa link Google Drive
+ */
+function formatDriveAudioUrl(url) {
+    if (!url) return '';
+    let fileId = '';
+    
+    let match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+        fileId = match[1];
+    } else {
+        match = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+            fileId = match[1];
+        }
+    }
+
+    if (fileId) {
+        return `https://docs.google.com/uc?export=open&id=${fileId}`;
+    }
+    return url.trim();
+}
+
+/**
+ * 2. Hàm đọc văn bản tự động (TTS) - ĐÃ KHẮC PHỤC LỖI ĐỌC UNDERSCORE
+ */
+function speakText(text) {
+    if (!text || !('speechSynthesis' in window)) return;
+
+    // XỬ LÝ TRIỆT ĐỂ: Thay thế tất cả dấu '_' thành khoảng trắng và xóa khoảng trắng thừa
+    let cleanText = text
+        .replace(/_/g, ' ')       // Đổi '_' thành ' ' để máy KHÔNG đọc "underscore"
+        .replace(/\s+/g, ' ')     // Rút gọn khoảng trắng
+        .trim();
+
+    if (!cleanText) return;
+
+    // Khởi tạo giọng đọc
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = 'en-US'; // Hoặc 'vi-VN' tùy theo môn học
+    utterance.rate = 0.9;     // Tốc độ đọc vừa phải
+
+    window.speechSynthesis.speak(utterance);
+}
+
+/**
+ * 3. Hàm tổng hợp xử lý khi bấm nút LOA (Kết hợp MP3 + Giọng đọc cũ)
+ */
+function playAudio(mp3Url, fallbackText) {
+    // Dừng mọi âm thanh / giọng đọc đang phát trước đó
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+    }
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+    }
+
+    // Trường hợp 1: Có link MP3 -> Ưu tiên phát MP3
+    if (mp3Url && mp3Url.trim() !== '' && mp3Url !== 'undefined' && mp3Url !== 'null') {
+        const playableUrl = formatDriveAudioUrl(mp3Url);
+        currentAudio = new Audio(playableUrl);
+        
+        currentAudio.play().catch(error => {
+            console.warn("Không phát được file MP3, tự động chuyển sang đọc văn bản:", error);
+            // Nếu link MP3 bị lỗi -> Tự động chuyển sang đọc chữ (TTS)
+            speakText(fallbackText);
+        });
+        return;
+    }
+
+    // Trường hợp 2: Không có file MP3 -> Đọc bằng giọng nói tự động (TTS) đã lọc dấu '_'
+    speakText(fallbackText);
+}
