@@ -1,4 +1,4 @@
-const API_URL = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec";
 
 let AppState = {
     allQuizData: [],
@@ -314,7 +314,7 @@ window.speakQuestion = function(index) {
     const item = AppState.currentQuizData[index];
     if (!item) return;
     
-    // 1. NHẬN DIỆN CÁC DẠNG BÀI ĐẶC BIỆT (Giữ nguyên logic cũ của bạn)
+    // 1. NHẬN DIỆN CÁC DẠNG BÀI ĐẶC BIỆT
     let isListeningType = false;
     if (item.loai === 'listening_fill') {
         isListeningType = true;
@@ -339,10 +339,27 @@ window.speakQuestion = function(index) {
                       item._isAnswered;
     }
 
-    // 3. CHUẨN BỊ TEXT CÂU HỎI VÀ ĐÁP ÁN (Giữ nguyên logic lấy đáp án cũ của bạn)
-    let questionText = item.passage || item.question || '';
-    let correctAnswerStr = '';
+    // 3. XỬ LÝ LẤY ĐÚNG NỘI DUNG CÂU HỎI (TRÁNH BỊ LẪN VỚI ĐOẠN VĂN / HƯỚNG DẪN CHUNG CỦA MADE)
+    let questionText = '';
     
+    // Ưu tiên lấy từ DOM của thẻ câu hỏi hiện tại trên màn hình nếu có (đảm bảo đọc chính xác câu đang hiển thị)
+    if (quizCards[index]) {
+        const qElement = quizCards[index].querySelector('.question-content') || quizCards[index].querySelector('.question-text');
+        if (qElement && qElement.innerText.trim()) {
+            questionText = qElement.innerText.trim();
+        }
+    }
+    
+    // Nếu không lấy được từ DOM, lọc từ item dữ liệu (tránh lấy nhầm passage hướng dẫn)
+    if (!questionText) {
+        questionText = item.question || '';
+        // Nếu item.question bị trùng với đoạn văn/hướng dẫn chung, cố gắng tìm trường khác hoặc dùng tạm
+        if (!questionText && item.passage && !item.passage.includes("Chọn phần gạch chân")) {
+            questionText = item.passage;
+        }
+    }
+
+    let correctAnswerStr = '';
     let correctKeys = item._correctKeys || (typeof getCorrectKeys === 'function' ? getCorrectKeys(item) : []);
     if (correctKeys.length > 0 && item[correctKeys[0]]) {
         correctAnswerStr = typeof cleanOptionText === 'function' ? cleanOptionText(item[correctKeys[0]]) : item[correctKeys[0]].replace(/^[A-D][\.\)]\s*/, '');
@@ -354,7 +371,6 @@ window.speakQuestion = function(index) {
 
     // 4. XỬ LÝ LỌC TEXT CHO TỪNG LOẠI BÀI
     if (isListeningType) {
-        // [Tính năng cũ]: Ưu tiên đọc nội dung dạng listening. Nếu có chỗ trống và có đáp án thì ghép vào.
         textToRead = questionText;
         if (correctAnswerStr) {
             if (textToRead.includes('___')) {
@@ -364,45 +380,36 @@ window.speakQuestion = function(index) {
             }
         }
     } else {
-        // [Tính năng chuẩn hóa]: Các dạng bài tập thông thường
         if (!hasAnswered) {
-            // Chưa làm: Chỉ lấy đề bài (sẽ được lọc dấu gạch dưới ở bước cuối)
             textToRead = questionText;
         } else {
-            // Đã làm: Chia trường hợp
             if (isVietAnh) {
-                // Bài Việt-Anh: Chỉ đọc đáp án (Tránh AI đọc tiếng Việt)
                 textToRead = correctAnswerStr;
             } else if (questionText.match(/_{2,}|\.{3,}/) && correctAnswerStr) {
-                // Câu hỏi trắc nghiệm có lỗ hổng (___): Ghép nối đáp án vào đúng vị trí
                 textToRead = questionText.replace(/_{2,}|\.{3,}/g, " " + correctAnswerStr + " ");
             } else {
-                // Câu hỏi trắc nghiệm bình thường: Đọc đề bài, nghỉ một chút, đọc đáp án
                 textToRead = questionText + ". " + correctAnswerStr;
             }
         }
     }
 
-    // 5. PHÁT FILE ÂM THANH ONLINE (Giữ nguyên tính năng cũ)
+    // 5. PHÁT FILE ÂM THANH ONLINE
     if (textToRead && (textToRead.startsWith('http://') || textToRead.startsWith('https://')) && 
         (textToRead.endsWith('.mp3') || textToRead.endsWith('.wav') || textToRead.endsWith('.m4a') || textToRead.includes('drive.google.com'))) {
         new Audio(textToRead).play().catch(() => alert("Không thể phát file âm thanh."));
         return;
     }
 
-    // 6. PHÁT ÂM BẰNG TEXT-TO-SPEECH (Tích hợp chống lỗi "underscore")
+    // 6. PHÁT ÂM BẰNG TEXT-TO-SPEECH
     if (textToRead && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         
-        // TRIỆT ĐỂ: Dọn sạch mọi dấu gạch dưới còn sót và khoảng trắng thừa 
-        // để AI đọc mượt mà cho dù người dùng đã chọn đáp án hay chưa
         let finalCleanText = textToRead.replace(/_/g, ' ')
-                                       .replace(/\s+/g, ' ')
-                                       .trim();
-                                       
+                                    .replace(/\s+/g, ' ')
+                                    .trim();
+                                    
         const utterance = new SpeechSynthesisUtterance(finalCleanText);
         utterance.lang = 'en-US';
-        // [Tính năng cũ]: Tốc độ đọc chậm hơn (0.85) cho bài Listening, bình thường (0.9)
         utterance.rate = isListeningType ? 0.85 : 0.9; 
         
         window.speechSynthesis.speak(utterance);
@@ -519,13 +526,36 @@ window.toggleDarkMode = function() {
 };
 
 window.handleSubjectChange = function() {
-    const mon = document.getElementById('subject-select').value;
-    const levelContainer = document.getElementById('level-container');
-    if (levelContainer) levelContainer.style.display = (mon === 'Tiếng Anh') ? 'block' : 'none';
+    // SỬ DỤNG cleanKey ĐỂ XÓA DẤU TRƯỚC KHI SO SÁNH
+    const monRaw = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+    const mon = cleanKey(monRaw);
     
+    const levelContainer = document.getElementById('level-container');
+    if (levelContainer) levelContainer.style.display = (mon.includes('anh') || mon.includes('english')) ? 'block' : 'none';
+    
+    // Xử lý ẩn hiện nút công cụ ngay tại màn hình chọn môn
+    const btnCalc = document.getElementById('btn-calc');
+    const btnDict = document.getElementById('btn-dict');
+    const btnVerbs = document.getElementById('btn-verbs');
+
+    if (mon.includes('toan') || mon.includes('math')) {
+        if (btnCalc) btnCalc.style.display = 'block';
+        if (btnDict) btnDict.style.display = 'none';
+        if (btnVerbs) btnVerbs.style.display = 'none';
+    } else if (mon.includes('anh') || mon.includes('english')) {
+        if (btnCalc) btnCalc.style.display = 'none';
+        if (btnDict) btnDict.style.display = 'block';
+        if (btnVerbs) btnVerbs.style.display = 'block';
+    } else {
+        // Ẩn hết nếu là môn khác
+        if (btnCalc) btnCalc.style.display = 'none';
+        if (btnDict) btnDict.style.display = 'none';
+        if (btnVerbs) btnVerbs.style.display = 'none';
+    }
+
     window.updateTopicList();
     window.updateMadeList();
-    window.renderLeaderboard(mon);
+    window.renderLeaderboard(monRaw);
     window.saveUserSelections();
 };
 
@@ -886,27 +916,34 @@ function getCorrectKeys(item) {
 }
 
 window.startQuiz = function() {
-    // Kiểm tra môn học đang chọn để ẩn/hiện nút phù hợp trên header
+    // KIỂM TRA MÔN BẰNG CÁCH DÙNG cleanKey
     const subjectSelect = document.getElementById('subject-select');
-    const selectedSubject = subjectSelect ? subjectSelect.value.toLowerCase() : '';
+    const selectedSubjectRaw = subjectSelect ? subjectSelect.value : '';
+    const selectedSubject = cleanKey(selectedSubjectRaw);
 
     const btnCalc = document.getElementById('btn-calc');
     const btnDict = document.getElementById('btn-dict');
     const btnVerbs = document.getElementById('btn-verbs');
 
-    // Kiểm tra nếu là môn Toán (có chứa chữ 'toan' hoặc tương tự)
+    // Nếu là môn Toán: Chỉ hiện máy tính, ẩn tra từ và động từ bất quy tắc
     if (selectedSubject.includes('toan') || selectedSubject.includes('math')) {
         if (btnCalc) btnCalc.style.display = 'block';
         if (btnDict) btnDict.style.display = 'none';
         if (btnVerbs) btnVerbs.style.display = 'none';
-    } else {
-        // Mặc định hoặc môn Tiếng Anh
+    } 
+    // Nếu là môn Tiếng Anh: Hiện tra từ và động từ bất quy tắc, ẩn máy tính
+    else if (selectedSubject.includes('anh') || selectedSubject.includes('english')) {
         if (btnCalc) btnCalc.style.display = 'none';
         if (btnDict) btnDict.style.display = 'block';
         if (btnVerbs) btnVerbs.style.display = 'block';
+    } else {
+        // Mặc định cho các môn khác (như Tiếng Việt)
+        if (btnCalc) btnCalc.style.display = 'none';
+        if (btnDict) btnDict.style.display = 'none';
+        if (btnVerbs) btnVerbs.style.display = 'none';
     }
 
-    const mon = document.getElementById('subject-select') ? document.getElementById('subject-select').value : '';
+    const mon = selectedSubjectRaw;
     if (!mon) return alert("Vui lòng chọn môn học trước khi bắt đầu!");
 
     const maHS = document.getElementById('student-code') ? document.getElementById('student-code').value.trim() : localStorage.getItem('saved_maHS');
@@ -1767,4 +1804,341 @@ window.calcCalculate = function() {
     } catch (e) {
         display.value = 'Lỗi';
     }
+};
+//--------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    const btnTaoDeToan = document.getElementById('btn-tao-de-toan');
+    
+    if (btnTaoDeToan) {
+        const newBtn = btnTaoDeToan.cloneNode(true);
+        btnTaoDeToan.parentNode.replaceChild(newBtn, btnTaoDeToan);
+
+        newBtn.addEventListener('click', async function(e) {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+
+            newBtn.innerText = "Đang tải dữ liệu trực tiếp...";
+            newBtn.disabled = true;
+
+            let dataList = null;
+
+            try {
+                let webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
+                
+                let response = await fetch(webAppUrl);
+                let result = await response.json();
+                dataList = result.questions || result.data || result;
+            } catch (err) {
+                console.error("Lỗi fetch:", err);
+            }
+
+            if (!dataList || dataList.length <= 1) {
+                alert("Không thể tải được dữ liệu trực tiếp. Hãy kiểm tra lại link Web App Google Sheets trong code!");
+                resetBtn();
+                return;
+            }
+
+            if (Array.isArray(dataList[0])) {
+                let headers = dataList[0];
+                let formattedList = [];
+                for (let i = 1; i < dataList.length; i++) {
+                    let row = dataList[i];
+                    let obj = {};
+                    for (let j = 0; j < headers.length; j++) {
+                        obj[headers[j]] = row[j];
+                    }
+                    formattedList.push(obj);
+                }
+                dataList = formattedList;
+            }
+
+            let filteredPool = dataList.filter(q => {
+                let m = q['Môn'] || q['mon'] || "";
+                return m.toString().trim().toLowerCase() === "toán";
+            });
+
+            if (filteredPool.length === 0) {
+                filteredPool = dataList;
+            }
+
+            let cauHinh = {
+                'Hình học': 2,
+                'Đổi đơn vị': 6,
+                'Phân số': 4,
+                'Phép tính số thập phân': 4,
+                'So sánh phân số': 6
+            };
+
+            let selectedQuestions = [];
+            let usedIds = new Set();
+
+            for (let chuDe in cauHinh) {
+                let countNeeded = cauHinh[chuDe];
+                let pool = filteredPool.filter(q => {
+                    let c = q['Chủ đề'] || q['chuDe'] || q['topic'] || "";
+                    return c.toString().trim().toLowerCase() === chuDe.toLowerCase();
+                });
+
+                pool = pool.sort(() => Math.random() - 0.5);
+                let picked = pool.slice(0, countNeeded);
+                
+                picked.forEach(item => {
+                    selectedQuestions.push(item);
+                    usedIds.add(item);
+                });
+            }
+
+            if (selectedQuestions.length < 21) {
+                let remainingPool = filteredPool.filter(q => !usedIds.has(q)).sort(() => Math.random() - 0.5);
+                let neededMore = 21 - selectedQuestions.length;
+                let extraPicked = remainingPool.slice(0, neededMore);
+                selectedQuestions = selectedQuestions.concat(extraPicked);
+            }
+
+            selectedQuestions = selectedQuestions.sort(() => Math.random() - 0.5);
+
+            let setupScreen = document.querySelector('.setup-screen, #setup-section, form');
+            if (setupScreen) setupScreen.style.display = 'none';
+
+            let htmlContent = `<div style="max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9; position: relative;">
+                
+                <!-- Popup Máy tính đã sửa lỗi vùng đen dư thừa bằng height: auto và display: inline-block -->
+                <div id="calc-modal" style="display: none; position: fixed; top: 120px; right: 50px; background: #222; padding: 10px; border-radius: 8px; z-index: 9999; box-shadow: 0 8px 20px rgba(0,0,0,0.4); width: 210px; height: auto !important; max-height: none !important; user-select: none;">
+                    
+                    <!-- Thanh tiêu đề kéo thả -->
+                    <div id="calc-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; cursor: move; background: #333; padding: 4px 8px; border-radius: 4px;">
+                        <span style="color: #ff9800; font-weight: bold; font-size: 13px;">🧮 Máy tính</span>
+                        <button id="calc-close" onclick="closeCalculatorModal()" style="background: #d32f2f; color: white; border: none; border-radius: 3px; cursor: pointer; padding: 1px 5px; font-size: 12px;">✕</button>
+                    </div>
+
+                    <input type="text" id="calc-display" readonly style="width: 100%; height: 32px; background: #fff; text-align: right; font-size: 16px; padding: 4px; margin-bottom: 8px; box-sizing: border-box; border-radius: 4px; border: none;" value="">
+                    
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;">
+                        <button class="calc-btn" onclick="calcClear()" style="background: #d32f2f; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">C</button>
+                        <button class="calc-btn" onclick="calcInput('(')" style="background: #555; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">(</button>
+                        <button class="calc-btn" onclick="calcInput(')')" style="background: #555; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">)</button>
+                        <button class="calc-btn" onclick="calcInput('÷')" style="background: #ff9800; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">÷</button>
+                        
+                        <button class="calc-btn" onclick="calcInput('7')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">7</button>
+                        <button class="calc-btn" onclick="calcInput('8')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">8</button>
+                        <button class="calc-btn" onclick="calcInput('9')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">9</button>
+                        <button class="calc-btn" onclick="calcInput('×')" style="background: #ff9800; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">×</button>
+                        
+                        <button class="calc-btn" onclick="calcInput('4')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">4</button>
+                        <button class="calc-btn" onclick="calcInput('5')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">5</button>
+                        <button class="calc-btn" onclick="calcInput('6')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">6</button>
+                        <button class="calc-btn" onclick="calcInput('-')" style="background: #ff9800; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">-</button>
+                        
+                        <button class="calc-btn" onclick="calcInput('1')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">1</button>
+                        <button class="calc-btn" onclick="calcInput('2')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">2</button>
+                        <button class="calc-btn" onclick="calcInput('3')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">3</button>
+                        <button class="calc-btn" onclick="calcInput('+')" style="background: #ff9800; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">+</button>
+                        
+                        <button class="calc-btn" onclick="calcInput('0')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; grid-column: span 2; font-weight:bold; cursor:pointer; font-size:13px;">0</button>
+                        <button class="calc-btn" onclick="calcInput('.')" style="background: #666; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">.</button>
+                        <button class="calc-btn" onclick="calcCalculate()" style="background: #4caf50; color:white; padding: 6px; border:none; border-radius:3px; font-weight:bold; cursor:pointer; font-size:13px;">=</button>
+                    </div>
+                </div>
+
+                <!-- Thanh điều hướng phía trên -->
+                <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px 15px; border-radius: 8px; border: 2px solid #b71c1c; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px;">
+                    <button id="btn-calc-toggle" onclick="openCalculatorModal()" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🧮 Calculator</button>
+                    <button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🏠 Trang chủ</button>
+                    <div style="font-size: 15px; font-weight: bold; color: #333;">Đúng: <span id="count-dung" style="color: green; font-size: 18px;">0</span> | Sai: <span id="count-sai" style="color: red; font-size: 18px;">0</span></div>
+                    <div style="font-size: 15px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 6px 12px; border-radius: 6px;">⏱ <span id="timer">30:00</span></div>
+                </div>
+                <h2 style="text-align: center; color: #b71c1c; margin-bottom: 20px;">ĐỀ TỔNG HỢP TOÁN (21 CÂU)</h2>`;
+
+            selectedQuestions.forEach((q, index) => {
+                let qText = q['Nội dung câu hỏi'] || q['Câu hỏi'] || q['question'] || "";
+                let a = q['Đáp án A'] || "";
+                let b = q['Đáp án B'] || "";
+                let c = q['Đáp án C'] || "";
+                let d = q['Đáp án D'] || "";
+
+                htmlContent += `
+                    <div class="question-card" id="q_card_${index}" style="background: white; border: 2px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <p style="font-weight: bold; font-size: 16px; color: #333;">Câu ${index + 1}: ${qText}</p>
+                        <div style="margin-left: 15px;">
+                            <label class="ans-label ans_${index}" data-ans="A" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="A"> A. ${a}</label>
+                            <label class="ans-label ans_${index}" data-ans="B" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="B"> B. ${b}</label>
+                            <label class="ans-label ans_${index}" data-ans="C" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="C"> C. ${c}</label>
+                            <label class="ans-label ans_${index}" data-ans="D" style="display: block; margin: 8px 0; padding: 6px 10px; border-radius: 4px; cursor: pointer;"><input type="radio" name="question_${index}" value="D"> D. ${d}</label>
+                        </div>
+                    </div>`;
+            });
+
+            htmlContent += `<button id="custom-submit-btn" style="display: block; width: 100%; padding: 12px; background: #2e7d32; color: white; font-size: 18px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px;">Nộp bài tổng kết</button></div>`;
+
+            let containerTarget = document.querySelector('#quiz-view') || document.body;
+            containerTarget.innerHTML = htmlContent;
+
+            // Xử lý kéo thả (Draggable)
+            const calcModal = document.getElementById('calc-modal');
+            const calcHeader = document.getElementById('calc-header');
+            let isDragging = false;
+            let offsetX, offsetY;
+
+            calcHeader.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                offsetX = e.clientX - calcModal.offsetLeft;
+                offsetY = e.clientY - calcModal.offsetTop;
+                calcModal.style.right = 'auto'; 
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                calcModal.style.left = (e.clientX - offsetX) + 'px';
+                calcModal.style.top = (e.clientY - offsetY) + 'px';
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            // Nút Trang chủ
+            document.getElementById('btn-home').addEventListener('click', () => {
+                location.reload();
+            });
+
+            // Hàm mở/đóng máy tính
+            window.openCalculatorModal = function() {
+                if (calcModal) calcModal.style.display = 'block';
+            };
+
+            window.closeCalculatorModal = function() {
+                if (calcModal) calcModal.style.display = 'none';
+            };
+
+            window.calcInput = function(value) {
+                const display = document.getElementById('calc-display');
+                if (display) {
+                    display.value += value;
+                }
+            };
+
+            window.calcClear = function() {
+                const display = document.getElementById('calc-display');
+                if (display) {
+                    display.value = '';
+                }
+            };
+
+            window.calcCalculate = function() {
+                const display = document.getElementById('calc-display');
+                if (!display || !display.value.trim()) return;
+
+                try {
+                    let expression = display.value.replace(/×/g, '*').replace(/÷/g, '/');
+                    let result = new Function(`return ${expression}`)();
+                    
+                    if (result !== undefined && !isNaN(result)) {
+                        display.value = result;
+                    } else {
+                        display.value = 'Lỗi';
+                    }
+                } catch (e) {
+                    display.value = 'Lỗi';
+                }
+            };
+
+            let scoreDung = 0;
+            let scoreSai = 0;
+
+            selectedQuestions.forEach((q, index) => {
+                let correctAns = (q['Đáp án đúng'] || "").toString().trim().toUpperCase();
+                let radios = document.querySelectorAll(`input[name="question_${index}"]`);
+
+                radios.forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        radios.forEach(r => r.disabled = true);
+
+                        let chosenVal = this.value;
+                        let labels = document.querySelectorAll(`.ans_${index}`);
+
+                        if (chosenVal === correctAns) {
+                            scoreDung++;
+                            document.getElementById('count-dung').innerText = scoreDung;
+                        } else {
+                            scoreSai++;
+                            document.getElementById('count-sai').innerText = scoreSai;
+                        }
+
+                        labels.forEach(lbl => {
+                            let lblAns = lbl.getAttribute('data-ans');
+                            if (lblAns === correctAns) {
+                                lbl.style.background = "#c8e6c9";
+                                lbl.style.fontWeight = "bold";
+                            }
+                            if (lblAns === chosenVal && chosenVal !== correctAns) {
+                                lbl.style.background = "#ffcdd2";
+                            }
+                        });
+                    });
+                });
+            });
+
+            document.getElementById('custom-submit-btn').addEventListener('click', () => {
+                if (window.timerInterval) clearInterval(window.timerInterval);
+                alert(`Bạn đã hoàn thành bài thi!\n- Số câu đúng: ${scoreDung}\n- Số câu sai: ${scoreSai}`);
+                location.reload();
+            });
+
+            let timeLeft = 30 * 60;
+            if (window.timerInterval) clearInterval(window.timerInterval);
+            window.timerInterval = setInterval(() => {
+                timeLeft--;
+                let m = Math.floor(timeLeft / 60);
+                let s = timeLeft % 60;
+                let timerDisplay = document.getElementById('timer');
+                if (timerDisplay) {
+                    timerDisplay.innerText = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+                }
+                if (timeLeft <= 0) {
+                    clearInterval(window.timerInterval);
+                    alert("Hết thời gian làm bài!");
+                    document.getElementById('custom-submit-btn')?.click();
+                }
+            }, 1000);
+        });
+    }
+
+    function resetBtn() {
+        const btn = document.getElementById('btn-tao-de-toan');
+        if (btn) {
+            btn.innerText = "🎯 Tạo đề tổng hợp Toán (30 phút - 21 câu)";
+            btn.disabled = false;
+        }
+    }
+});
+window.downloadPDF = function() {
+    // 1. Lấy phần thẻ chứa danh sách câu hỏi / bài tập (ví dụ id="quiz-container")
+    const element = document.getElementById('quiz-container'); 
+
+    if (!element) {
+        alert("Không tìm thấy nội dung bài tập!");
+        return;
+    }
+
+    // 2. Cấu hình file PDF xuất ra
+    const opt = {
+        margin:       [10, 10, 10, 10], // Lề top, left, bottom, right (mm)
+        filename:     'Bai_tap_tong_hop.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true }, // Tăng độ nét
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    // 3. Tạm thời ẩn các nút bấm bên trong vùng cần chụp
+    const actionButtons = element.querySelectorAll('button, .no-print');
+    actionButtons.forEach(btn => btn.style.visibility = 'hidden');
+
+    // 4. Xuất và tải file PDF
+    html2pdf().set(opt).from(element).save().then(() => {
+        // Hiện lại các nút bấm sau khi xuất xong
+        actionButtons.forEach(btn => btn.style.visibility = 'visible');
+    });
+};
+window.printQuiz = function() {
+    window.print();
 };
