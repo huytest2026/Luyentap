@@ -1467,21 +1467,29 @@ window.submitQuiz = function() {
     });
 
     if (maHS && mon) {
-        fetch(API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                maHS: maHS, 
-                mon: mon, 
-                score: score, 
-                level: level, 
-                chuDe: selectedTopicsStr,
-                made: selectedMade,
-                details: details 
-            })
-        }).catch(err => console.log('Lỗi gửi kết quả:', err));
-    }
+    fetch(API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            maHS: maHS,
+            mon: mon,
+            score: score,
+            level: level,
+            chuDe: selectedTopicsStr,
+            made: selectedMade,
+            details: details,
+
+            // 👇 BỔ SUNG THÊM 2 DÒNG NÀY ĐỂ TRUYỀN DỮ LIỆU MÁY TÍNH
+            calcOpenCount: (window.calcLogs && window.calcLogs.openCount) ? window.calcLogs.openCount : 0,
+            calcHistory: (window.calcLogs && window.calcLogs.history && window.calcLogs.history.length > 0) 
+                         ? window.calcLogs.history.map(item => 
+                             typeof item === 'string' ? item : `[${item.time || ''}] ${item.expression || ''} = ${item.result || ''}`
+                           ).join("\n") 
+                         : "Không sử dụng máy tính"
+        })
+    }).catch(err => console.log('Lỗi gửi kết quả:', err));
+}
 
     let quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'none';
@@ -1823,7 +1831,7 @@ document.addEventListener('DOMContentLoaded', () => {
             let dataList = null;
 
             try {
-                let webAppUrl = "https://script.google.com/macros/s/AKfycbzKhjTj95GBob8cPfSikXMUVg2S0vJ0BkEOTk2da1IY9xUFFGa8HvrM3FGLO-AJ6tvJ/exec"; 
+                let webAppUrl = "https://script.google.com/macros/s/AKfycbwClcRQ_6XkCq-psx7vOYArfCloZuQ_hBygTWmx_shheM27EaSYlyYUqk-2N97lXqCFew/exec"; 
                 
                 let response = await fetch(webAppUrl);
                 let result = await response.json();
@@ -2142,3 +2150,61 @@ window.downloadPDF = function() {
 window.printQuiz = function() {
     window.print();
 };
+// ============================================================
+// ============================================================
+// BỘ ĐẾM & LƯU LỊCH SỬ MÁY TÍNH CHUẨN XÁC 100%
+// ============================================================
+if (!window.calcLogs) {
+    window.calcLogs = { openCount: 0, history: [] };
+}
+
+document.addEventListener('click', function(e) {
+    var target = e.target;
+    var btn = target.closest('button, a, div, span');
+    if (!btn) return;
+
+    var text = (btn.innerText || btn.textContent || '').trim();
+
+    // 1. ĐẾM SỐ LẦN MỞ MÁY TÍNH (Nút màu cam trên cùng)
+    // Kiểm tra xem vị trí click có nằm TRONG khung popup máy tính hay không
+    var isInsideCalcModal = target.closest('.modal-content, .calc-body, .calculator-modal, #calcModal');
+    
+    if (text.includes('Calculator') && !isInsideCalcModal) {
+        window.calcLogs.openCount = (window.calcLogs.openCount || 0) + 1;
+        console.log("🔥 [ĐÃ ĐẾM MỞ] Số lần mở máy tính:", window.calcLogs.openCount);
+    }
+
+    // 2. LƯU LỊCH SỬ KHI BẤM DẤU BẰNG (=)
+    if (text === '=') {
+        setTimeout(function() {
+            var calcDisplay = null;
+            var allInputs = document.querySelectorAll('input');
+
+            // Tìm ô input hiển thị của máy tính khoa học
+            allInputs.forEach(function(inp) {
+                if (inp.closest('.modal, [class*="calc"], [id*="calc"]') && inp.type !== 'hidden') {
+                    calcDisplay = inp;
+                }
+            });
+
+            // Dự phòng: Lấy ô input chứa giá trị số (Bỏ qua ô nhập Mã học sinh)
+            if (!calcDisplay) {
+                allInputs.forEach(function(inp) {
+                    var valStr = String(inp.value || '').trim();
+                    if (valStr && !isNaN(valStr) && inp.type !== 'hidden' && inp.id !== 'maHS') {
+                        calcDisplay = inp;
+                    }
+                });
+            }
+
+            var val = calcDisplay ? calcDisplay.value : '0';
+            var time = new Date().toLocaleTimeString('vi-VN');
+
+            if (!window.calcLogs.history) window.calcLogs.history = [];
+            var logText = "[" + time + "] Phép tính / Kết quả: " + val;
+            window.calcLogs.history.push(logText);
+
+            console.log("🔥 [ĐÃ LƯU KẾT QUẢ CHUẨN]:", logText);
+        }, 100);
+    }
+}, true);
