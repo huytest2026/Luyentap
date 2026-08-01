@@ -1466,21 +1466,31 @@ window.submitQuiz = function() {
         };
     });
 
-    if (maHS && mon) {
+    // 1. Tự động bù tên Môn và Chủ đề nếu làm Đề tổng hợp (tránh bị undefined)
+var submitMon = mon || "Toán"; 
+var submitChuDe = selectedTopicsStr;
+
+// Nếu không có tên chủ đề lẻ, tự động đặt tên là "Đề tổng hợp Toán (21 câu)"
+if (!submitChuDe || submitChuDe === "") {
+    submitChuDe = "Đề tổng hợp Toán (21 câu)";
+}
+
+// 2. Chỉ cần có Mã học sinh (maHS) là BẮT BUỘC gửi về Google Sheets
+if (maHS) {
     fetch(API_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             maHS: maHS,
-            mon: mon,
+            mon: submitMon,
             score: score,
-            level: level,
-            chuDe: selectedTopicsStr,
-            made: selectedMade,
-            details: details,
+            level: level || 1,
+            chuDe: submitChuDe,
+            made: selectedMade || "Đề tổng hợp",
+            details: details || [],
 
-            // 👇 BỔ SUNG THÊM 2 DÒNG NÀY ĐỂ TRUYỀN DỮ LIỆU MÁY TÍNH
+            // Dữ liệu máy tính
             calcOpenCount: (window.calcLogs && window.calcLogs.openCount) ? window.calcLogs.openCount : 0,
             calcHistory: (window.calcLogs && window.calcLogs.history && window.calcLogs.history.length > 0) 
                          ? window.calcLogs.history.map(item => 
@@ -1488,7 +1498,11 @@ window.submitQuiz = function() {
                            ).join("\n") 
                          : "Không sử dụng máy tính"
         })
-    }).catch(err => console.log('Lỗi gửi kết quả:', err));
+    }).then(() => {
+        console.log("✅ Đã gửi bài thi tổng hợp thành công!");
+    }).catch(err => console.log('❌ Lỗi gửi kết quả:', err));
+} else {
+    console.warn("⚠️ Chưa có Mã học sinh (maHS) nên chưa gửi được!");
 }
 
     let quizScreen = document.getElementById('quiz-screen');
@@ -2208,3 +2222,44 @@ document.addEventListener('click', function(e) {
         }, 100);
     }
 }, true);
+// ============================================================
+// BỘ TỰ ĐỘNG BẮT MỌI LẦN NỘP BÀI (ÁP DỤNG CẢ ĐỀ THƯỜNG VÀ ĐỀ TỔNG HỢP 21 CÂU)
+// ============================================================
+(function() {
+    var originalFetch = window.fetch;
+    window.fetch = function() {
+        var args = Array.prototype.slice.call(arguments);
+        var url = args[0];
+        var options = args[1];
+
+        // Tự động kiểm tra nếu là lệnh gửi kết quả (POST) về Google Sheets
+        if (options && options.method === 'POST' && options.body) {
+            try {
+                var data = JSON.parse(options.body);
+                
+                // 1. Tự động bổ sung tên Chủ đề nếu làm Đề tổng hợp 21 câu mà bị trống
+                if (!data.chuDe || data.chuDe === "" || data.chuDe === "undefined") {
+                    data.chuDe = "Đề tổng hợp Toán (21 câu)";
+                }
+                if (!data.mon || data.mon === "undefined") {
+                    data.mon = "Toán";
+                }
+
+                // 2. Tự động đính kèm Số lần mở & Lịch sử máy tính khoa học
+                data.calcOpenCount = (window.calcLogs && window.calcLogs.openCount) ? window.calcLogs.openCount : 0;
+                data.calcHistory = (window.calcLogs && window.calcLogs.history && window.calcLogs.history.length > 0) 
+                             ? window.calcLogs.history.map(item => 
+                                 typeof item === 'string' ? item : `[${item.time || ''}] ${item.expression || ''} = ${item.result || ''}`
+                               ).join("\n") 
+                             : "Không sử dụng máy tính";
+
+                // Cập nhật lại gói dữ liệu hoàn chỉnh trước khi gửi đi
+                options.body = JSON.stringify(data);
+                console.log("🚀 [ĐÃ BẮT HOÀN HẢO] Đã tự động đóng gói dữ liệu nộp bài:", data);
+            } catch(err) {
+                console.log("Lỗi tự đồng bộ payload:", err);
+            }
+        }
+        return originalFetch.apply(this, args);
+    };
+})();
