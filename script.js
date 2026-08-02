@@ -775,44 +775,6 @@ window.renderLeaderboard = function(subjectFilter = null) {
     let bacList = [];
     let dongList = [];
 
-    // --- ĐỌC CHÍNH XÁC CỘT MADE (Cột N / made / maDe) ---
-    let madeDiamondTracker = {}; 
-
-    AppState.rankings.forEach(a => {
-        let name = String(a.name || '').trim();
-        let subj = standardizeSubject ? standardizeSubject(String(a.subject || '').trim()) : String(a.subject || '').trim();
-        let score = Number(a.score) || 0;
-
-        // Bắt chính xác các biến thể tên cột Mã đề từ Google Sheets
-        let made = String(a.MADE || a.made || a.maDe || a.code || '').trim();
-
-        // Nếu điểm đạt 10 và có chọn Mã đề cụ thể
-        if (made && made !== "" && score === 10) {
-            let key = name + '___' + subj + '___' + made;
-            madeDiamondTracker[key] = (madeDiamondTracker[key] || 0) + 1;
-            
-            // Nếu đạt từ 2 lần 10 điểm trở lên cho cùng một Mã đề
-            if (madeDiamondTracker[key] >= 2) {
-                let kcKey = name + '___' + subj + '___' + made;
-                let infoText = `(Mã đề: ${made} - Đạt ${madeDiamondTracker[key]} lần điểm 10)`;
-                let existingRecord = kimCuongList.find(x => x.kcKey === kcKey);
-                
-                if (!existingRecord) {
-                    kimCuongList.push({
-                        name: name,
-                        subject: subj,
-                        score: 10,
-                        date: a.date || '',
-                        info: infoText,
-                        kcKey: kcKey
-                    });
-                } else {
-                    existingRecord.info = infoText;
-                }
-            }
-        }
-    });
-
     for (let key in studentSubjects) {
         let st = studentSubjects[key];
         if (activeSubject && cleanKey(st.subject) !== cleanKey(activeSubject)) continue;
@@ -839,14 +801,13 @@ window.renderLeaderboard = function(subjectFilter = null) {
             name: st.name,
             subject: st.subject,
             score: bestScore,
-            date: latestAttempt.date || '',
-            info: ''
+            date: latestAttempt.date || ''
         };
 
         if (hasExplicitLevel) {
             attempts.forEach(a => {
                 let lvl = String(a.level || '').trim();
-                let rec = { name: st.name, subject: st.subject, score: Number(a.score) || bestScore, date: a.date || '', info: '' };
+                let rec = { name: st.name, subject: st.subject, score: Number(a.score) || bestScore, date: a.date || '' };
                 if (lvl === "Kim Cương" && !kimCuongList.some(x => x.name === st.name && x.subject === st.subject)) kimCuongList.push(rec);
                 if (lvl === "Vàng" && !vangList.some(x => x.name === st.name && x.subject === st.subject)) vangList.push(rec);
                 if (lvl === "Bạc" && !bacList.some(x => x.name === st.name && x.subject === st.subject)) bacList.push(rec);
@@ -858,7 +819,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
             let count8 = attempts.filter(a => a._parsedScore >= 8).length;
 
             let sortedAttempts = [...attempts].sort((a, b) => parseCustomDate(a.date) - parseCustomDate(b.date));
-            let isKimCuongTopic = false;
+            let isKimCuong = false;
             if (sortedAttempts.length >= 3) {
                 for (let i = 0; i <= sortedAttempts.length - 3; i++) {
                     let s1 = sortedAttempts[i]._parsedScore;
@@ -870,21 +831,17 @@ window.renderLeaderboard = function(subjectFilter = null) {
 
                     if (s1 === 10 && s2 === 10 && s3 === 10) {
                         if (!t1 || !t2 || !t3 || (t1 !== t2 && t2 !== t3 && t1 !== t3)) {
-                            isKimCuongTopic = true;
+                            isKimCuong = true;
                             break;
                         }
                     }
                 }
             }
 
-            if (isKimCuongTopic && !kimCuongList.some(x => x.name === st.name && x.subject === st.subject)) {
-                record.info = "(3 lần liên tiếp đạt 10 điểm, khác chủ đề)";
-                kimCuongList.push(record);
-            }
-
-            if (count10 > 0 && !vangList.some(x => x.name === st.name && x.subject === st.subject)) vangList.push(record);
-            if (count9 >= 2 && !bacList.some(x => x.name === st.name && x.subject === st.subject)) bacList.push(record);
-            if (count8 >= 2 && !dongList.some(x => x.name === st.name && x.subject === st.subject)) dongList.push(record);
+            if (isKimCuong) kimCuongList.push(record);
+            if (count10 > 0) vangList.push(record);
+            if (count9 >= 2) bacList.push(record);
+            if (count8 >= 2) dongList.push(record);
         }
     }
 
@@ -897,10 +854,9 @@ window.renderLeaderboard = function(subjectFilter = null) {
         if (listItems.length === 0) {
             return `<div style="margin-bottom: 12px; font-size: 1.02em;"><b>${title}:</b> <span style="color: #888; font-style: italic;">Chưa có học sinh đạt chuẩn</span></div>`;
         }
-        let itemsHtml = listItems.map(item => {
-            let infoStr = item.info ? ` <span style="color: #666; font-size: 0.9em; font-style: italic;">${escapeHTML(item.info)}</span>` : '';
-            return `<li style="margin: 6px 0;"><b>${escapeHTML(item.name)}</b> (Môn: <span style="color: #007bff; font-weight: 600;">${escapeHTML(item.subject)}</span> - Điểm: ${item.score} đ)${infoStr}</li>`;
-        }).join('');
+        let itemsHtml = listItems.map(item => 
+            `<li style="margin: 6px 0;"><b>${escapeHTML(item.name)}</b> (Môn: <span style="color: #007bff; font-weight: 600;">${escapeHTML(item.subject)}</span> - Điểm cao nhất: ${item.score} đ)</li>`
+        ).join('');
         return `<div style="margin-bottom: 16px;">
                     <b style="color: ${color}; font-size: 1.1em;">${title}:</b>
                     <ul style="margin: 6px 0 0 20px; padding: 0; font-size: 1.05em;">${itemsHtml}</ul>
@@ -908,7 +864,7 @@ window.renderLeaderboard = function(subjectFilter = null) {
     }
 
     let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
-    html += buildGroupHtml('💎 Kim Cương (3 chủ đề khác nhau đạt 10 điểm liên tiếp hoặc đạt 2 lần 10 điểm cùng Mã đề)', '#007bff', kimCuongList);
+    html += buildGroupHtml('💎 Kim Cương (3 lần liên tiếp đạt 10 điểm, khác chủ đề)', '#007bff', kimCuongList);
     html += buildGroupHtml('🥇 Vàng (Có ít nhất 1 lần đạt 10 điểm)', '#d9822b', vangList);
     html += buildGroupHtml('🥈 Bạc (Có ít nhất 1 lần đạt 9 điểm trở lên và nhỏ hơn 10)', '#6c757d', bacList);
     html += buildGroupHtml('🥉 Đồng (Có ít nhất 1 lần đạt 8 điểm trở lên và nhỏ hơn 9)', '#cd7f32', dongList);
@@ -923,7 +879,7 @@ function extractTopicFlexible(att) {
     
     for (let key in att) {
         let val = att[key];
-        if (typeof val === 'string' && val.length > 2 && !['name', 'subject', 'date', 'score', 'made', 'Họ tên', 'Môn', 'Ngày', 'Điểm', 'Mã đề'].includes(key)) {
+        if (typeof val === 'string' && val.length > 2 && !['name', 'subject', 'date', 'score', 'Họ tên', 'Môn', 'Ngày', 'Điểm'].includes(key)) {
             return cleanKey(val);
         }
     }
@@ -1510,37 +1466,44 @@ window.submitQuiz = function() {
         };
     });
 
-    var submitMon = mon || "Toán"; 
-    var submitChuDe = selectedTopicsStr;
+    // 1. Tự động bù tên Môn và Chủ đề nếu làm Đề tổng hợp (tránh bị undefined)
+var submitMon = mon || "Toán"; 
+var submitChuDe = selectedTopicsStr;
 
-    if (!submitChuDe || submitChuDe === "") {
-        submitChuDe = "Đề tổng hợp Toán (21 câu)";
-    }
+// Nếu không có tên chủ đề lẻ, tự động đặt tên là "Đề tổng hợp Toán (21 câu)"
+if (!submitChuDe || submitChuDe === "") {
+    submitChuDe = "Đề tổng hợp Toán (21 câu)";
+}
 
-    if (maHS) {
-        fetch(API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                maHS: maHS,
-                mon: submitMon,
-                score: score,
-                level: level || 1,
-                chuDe: submitChuDe,
-                made: selectedMade || "Đề tổng hợp",
-                details: details || [],
-                calcOpenCount: (window.calcLogs && window.calcLogs.openCount) ? window.calcLogs.openCount : 0,
-                calcHistory: (window.calcLogs && window.calcLogs.history && window.calcLogs.history.length > 0) 
-                             ? window.calcLogs.history.map(item => 
-                                 typeof item === 'string' ? item : `[${item.time || ''}] ${item.expression || ''} = ${item.result || ''}`
-                               ).join("\n") 
-                             : "Không sử dụng máy tính"
-            })
-        }).then(() => {
-            console.log("✅ Đã gửi bài thi tổng hợp thành công!");
-        }).catch(err => console.log('❌ Lỗi gửi kết quả:', err));
-    }
+// 2. Chỉ cần có Mã học sinh (maHS) là BẮT BUỘC gửi về Google Sheets
+if (maHS) {
+    fetch(API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            maHS: maHS,
+            mon: submitMon,
+            score: score,
+            level: level || 1,
+            chuDe: submitChuDe,
+            made: selectedMade || "Đề tổng hợp",
+            details: details || [],
+
+            // Dữ liệu máy tính
+            calcOpenCount: (window.calcLogs && window.calcLogs.openCount) ? window.calcLogs.openCount : 0,
+            calcHistory: (window.calcLogs && window.calcLogs.history && window.calcLogs.history.length > 0) 
+                         ? window.calcLogs.history.map(item => 
+                             typeof item === 'string' ? item : `[${item.time || ''}] ${item.expression || ''} = ${item.result || ''}`
+                           ).join("\n") 
+                         : "Không sử dụng máy tính"
+        })
+    }).then(() => {
+        console.log("✅ Đã gửi bài thi tổng hợp thành công!");
+    }).catch(err => console.log('❌ Lỗi gửi kết quả:', err));
+} else {
+    console.warn("⚠️ Chưa có Mã học sinh (maHS) nên chưa gửi được!");
+}
 
     let quizScreen = document.getElementById('quiz-screen');
     if (quizScreen) quizScreen.style.display = 'none';
@@ -1553,14 +1516,12 @@ window.submitQuiz = function() {
         document.body.appendChild(resultContainer);
     }
 
-    // ĐÃ THÊM NÚT IN PDF VÀO ĐÂY
     resultContainer.innerHTML = '<h2 style="text-align: center; color: #540606; font-size: 1.6em;">Kết Quả Bài Làm</h2>' +
         '<p style="font-size: 1.2em; text-align: center;">Số câu hỏi đúng: <b>' + AppState.correctCount + ' / ' + totalQuestions + '</b></p>' +
         '<p style="font-size: 1.4em; text-align: center; font-weight: bold;">Điểm số: ' + score + ' đ</p>' +
-        '<div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">' +
+        '<div style="display: flex; gap: 12px; margin-top: 20px;">' +
         '<button type="button" onclick="window.location.reload()" style="flex: 1; padding: 14px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.05em;">Làm bài mới</button>' +
         '<button type="button" onclick="window.viewReviewDetails()" style="flex: 1; padding: 14px; background: #6c757d; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.05em;">🔍 Xem lại chi tiết</button>' +
-        '<button type="button" onclick="window.printPDF()" style="flex: 1; padding: 14px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1.05em;">🖨️ In / Lưu PDF</button>' +
         '</div>' +
         '<div id="review-detail-box" style="margin-top: 20px;"></div>';
 };
@@ -1965,7 +1926,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 <!-- Popup Máy tính đã sửa lỗi vùng đen dư thừa bằng height: auto và display: inline-block -->
                 <div id="calc-modal" style="display: none; position: fixed; top: 120px; right: 50px; background: #222; padding: 10px; border-radius: 8px; z-index: 9999; box-shadow: 0 8px 20px rgba(0,0,0,0.4); width: 210px; height: auto !important; max-height: none !important; user-select: none;">
-                 
+                    
                     <!-- Thanh tiêu đề kéo thả -->
                     <div id="calc-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; cursor: move; background: #333; padding: 4px 8px; border-radius: 4px;">
                         <span style="color: #ff9800; font-weight: bold; font-size: 13px;">🧮 Máy tính</span>
@@ -2004,7 +1965,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <!-- Thanh điều hướng phía trên -->
                 <div style="display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 12px 15px; border-radius: 8px; border: 2px solid #b71c1c; margin-bottom: 20px; position: sticky; top: 10px; z-index: 100; box-shadow: 0 4px 6px rgba(0,0,0,0.1); flex-wrap: wrap; gap: 10px;">
                     <button id="btn-calc-toggle" onclick="openCalculatorModal()" style="background: #ff9800; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🧮 Calculator</button>
-                    <button type="button" onclick="window.printPDF()" style="padding: 10px 16px; background: #28a745; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.95em;">🖨️ In / PDF</button>
+                    '<button type="button" onclick="window.printPDF()" style="background: #28a745; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1em;">🖨️ In / PDF</button>' +
                     <button id="btn-home" style="background: #607d8b; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">🏠 Trang chủ</button>
                     <div style="font-size: 15px; font-weight: bold; color: #333;">Đúng: <span id="count-dung" style="color: green; font-size: 18px;">0</span> | Sai: <span id="count-sai" style="color: red; font-size: 18px;">0</span></div>
                     <div style="font-size: 15px; font-weight: bold; color: #d32f2f; background: #ffebee; padding: 6px 12px; border-radius: 6px;">⏱ <span id="timer">30:00</span></div>
@@ -2310,35 +2271,3 @@ window.printPDF = function() {
     }
     window.print();
 };
-(function injectStyles() {
-    const style = document.createElement('style');
-    style.innerHTML = `
-        .quiz-card { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 22px; margin-bottom: 22px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); font-size: 1.15em; }
-        .option-box { background: #f8f9fa; border: 1px solid #540606; border-radius: 8px; padding: 14px 18px; margin: 10px 0; cursor: pointer; transition: all 0.2s ease; font-weight: 600; font-size: 1.1em; color: #111; }
-        .option-box:hover { background: #e9ecef; border-color: #adb5bd; }
-        .explanation-box { margin-top: 15px; padding: 14px; background: #fff3cd; border-left: 5px solid #ffc107; border-radius: 4px; display: none; color: #856404; font-size: 1.05em; line-height: 1.5; font-weight: 500; }
-        .leaderboard-container { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 1px solid #eee; }
-        .speech-btn { background: #ffc107; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 0.95em; font-weight: bold; color: #000; display: inline-flex; align-items: center; gap: 4px; }
-        .speech-btn:hover { background: #e0a800; }
-        .passage-box { background: #ffffff; border: 2px solid #540606; border-radius: 12px; padding: 22px; margin-bottom: 22px; font-size: 1.15em; line-height: 1.7; color: #222; font-weight: 500; }
-        .passage-tag { display: inline-block; background: #e9ecef; border: 1px solid #ced4da; padding: 6px 16px; font-weight: bold; border-radius: 6px; margin-bottom: 12px; color: #333; font-size: 1.05em; }
-        input[type="text"], select { width: 100%; padding: 14px 18px; margin: 8px 0 15px 0; border: 1px solid #540606; border-radius: 8px; box-sizing: border-box; font-size: 1.1em; background: #ffffff; color: #000; font-weight: 500; }
-        #topic-container { width: 100%; background: #ffffff; border: 1px solid #540606; border-radius: 8px; padding: 14px 18px; margin: 8px 0 15px 0; box-sizing: border-box; min-height: 60px; max-height: 220px; overflow-y: auto; font-size: 1.05em; }
-        body.dark-mode { background-color: #121212 !important; color: #e0e0e0; }
-        body.dark-mode .container { background: #1e1e1e; color: #e0e0e0; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        body.dark-mode .quiz-card, body.dark-mode .passage-box { background: #2d2d2d; border-color: #777; color: #e0e0e0; }
-        body.dark-mode .option-box { background: #3a3a3a; border-color: #666; color: #e0e0e0; }
-        body.dark-mode .option-box:hover { background: #4a4a4a; border-color: #888; }
-        body.dark-mode input[type="text"], body.dark-mode select { background: #2d2d2d; color: #e0e0e0; border-color: #777; }
-        body.dark-mode #topic-container { background: #2d2d2d; border-color: #777; color: #e0e0e0; }
-        .dark-mode-btn { position: absolute; top: 20px; right: 20px; background: #ffffff; color: #333; border: 2px solid #540606; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1em; z-index: 10; }
-        
-        /* CSS tối ưu khi in/lưu PDF */
-        @media print {
-            body { background: #fff !important; color: #000 !important; }
-            button, #calc-modal, .dark-mode-btn { display: none !important; }
-            #result-container { box-shadow: none !important; border: none !important; padding: 0 !important; }
-        }
-    `;
-    document.head.appendChild(style);
-})();
