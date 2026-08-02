@@ -328,37 +328,9 @@ window.speakQuestion = function(index) {
 
     const chuDeLower = (item.chuDe || '').toLowerCase();
     const isVietAnh = chuDeLower.includes('việt anh') || chuDeLower.includes('viet anh');
+    const isAnhViet = chuDeLower.includes('anh việt') || chuDeLower.includes('anh - việt') || chuDeLower.includes('anh-việt');
 
-    // 2. KIỂM TRA TRẠNG THÁI TRẢ LỜI
-    let hasAnswered = false;
-    const quizCards = document.querySelectorAll('.quiz-card');
-    if (quizCards[index]) {
-        hasAnswered = quizCards[index].querySelector('.option-box.selected-option') !== null || 
-                      quizCards[index].querySelector('input[type="checkbox"]:checked') !== null ||
-                      quizCards[index].querySelector('input:disabled') !== null ||
-                      item._isAnswered;
-    }
-
-    // 3. XỬ LÝ LẤY ĐÚNG NỘI DUNG CÂU HỎI (TRÁNH BỊ LẪN VỚI ĐOẠN VĂN / HƯỚNG DẪN CHUNG CỦA MADE)
-    let questionText = '';
-    
-    // Ưu tiên lấy từ DOM của thẻ câu hỏi hiện tại trên màn hình nếu có (đảm bảo đọc chính xác câu đang hiển thị)
-    if (quizCards[index]) {
-        const qElement = quizCards[index].querySelector('.question-content') || quizCards[index].querySelector('.question-text');
-        if (qElement && qElement.innerText.trim()) {
-            questionText = qElement.innerText.trim();
-        }
-    }
-    
-    // Nếu không lấy được từ DOM, lọc từ item dữ liệu (tránh lấy nhầm passage hướng dẫn)
-    if (!questionText) {
-        questionText = item.question || '';
-        // Nếu item.question bị trùng với đoạn văn/hướng dẫn chung, cố gắng tìm trường khác hoặc dùng tạm
-        if (!questionText && item.passage && !item.passage.includes("Chọn phần gạch chân")) {
-            questionText = item.passage;
-        }
-    }
-
+    // 2. LẤY ĐÁP ÁN ĐÚNG TIẾNG ANH (Ưu tiên lấy sớm)
     let correctAnswerStr = '';
     let correctKeys = item._correctKeys || (typeof getCorrectKeys === 'function' ? getCorrectKeys(item) : []);
     if (correctKeys.length > 0 && item[correctKeys[0]]) {
@@ -367,9 +339,26 @@ window.speakQuestion = function(index) {
         correctAnswerStr = typeof cleanOptionText === 'function' ? cleanOptionText(item.correct) : item.correct;
     }
 
+    // 3. XỬ LÝ LẤY NỘI DUNG CÂU HỎI
+    let questionText = '';
+    const quizCards = document.querySelectorAll('.quiz-card');
+    if (quizCards[index]) {
+        const qElement = quizCards[index].querySelector('.question-content') || quizCards[index].querySelector('.question-text');
+        if (qElement && qElement.innerText.trim()) {
+            questionText = qElement.innerText.trim();
+        }
+    }
+    
+    if (!questionText) {
+        questionText = item.question || '';
+        if (!questionText && item.passage && !item.passage.includes("Chọn phần gạch chân")) {
+            questionText = item.passage;
+        }
+    }
+
     let textToRead = '';
 
-    // 4. XỬ LÝ LỌC TEXT CHO TỪNG LOẠI BÀI
+    // 4. XỬ LÝ LỌC TEXT CHỈ ĐỌC TIẾNG ANH THEO TỪNG CHỦ ĐỀ
     if (isListeningType) {
         textToRead = questionText;
         if (correctAnswerStr) {
@@ -379,21 +368,34 @@ window.speakQuestion = function(index) {
                 textToRead = textToRead.replace(/\.{3,}/g, " " + correctAnswerStr + " ");
             }
         }
+    } else if (isVietAnh) {
+        // Chủ đề Việt - Anh: Câu hỏi là tiếng Việt, bấm Nghe sẽ đọc từ tiếng Anh (đáp án đúng)
+        textToRead = correctAnswerStr;
+    } else if (isAnhViet) {
+        // Chủ đề Anh - Việt: Câu hỏi là tiếng Anh, bấm Nghe sẽ đọc câu hỏi tiếng Anh
+        textToRead = questionText;
     } else {
-        if (!hasAnswered) {
-            textToRead = questionText;
-        } else {
-            if (isVietAnh) {
-                textToRead = correctAnswerStr;
-            } else if (questionText.match(/_{2,}|\.{3,}/) && correctAnswerStr) {
+        // Các chủ đề khác (kiểm tra trạng thái đã trả lời chưa)
+        let hasAnswered = false;
+        if (quizCards[index]) {
+            hasAnswered = quizCards[index].querySelector('.option-box.selected-option') !== null || 
+                          quizCards[index].querySelector('input[type="checkbox"]:checked') !== null ||
+                          quizCards[index].querySelector('input:disabled') !== null ||
+                          item._isAnswered;
+        }
+        
+        if (hasAnswered) {
+            if (questionText.match(/_{2,}|\.{3,}/) && correctAnswerStr) {
                 textToRead = questionText.replace(/_{2,}|\.{3,}/g, " " + correctAnswerStr + " ");
             } else {
                 textToRead = questionText + ". " + correctAnswerStr;
             }
+        } else {
+            textToRead = questionText;
         }
     }
 
-    // 5. PHÁT FILE ÂM THANH ONLINE
+    // 5. PHÁT FILE ÂM THANH ONLINE (NẾU CÓ)
     if (textToRead && (textToRead.startsWith('http://') || textToRead.startsWith('https://')) && 
         (textToRead.endsWith('.mp3') || textToRead.endsWith('.wav') || textToRead.endsWith('.m4a') || textToRead.includes('drive.google.com'))) {
         new Audio(textToRead).play().catch(() => alert("Không thể phát file âm thanh."));
