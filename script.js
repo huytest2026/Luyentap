@@ -66,6 +66,7 @@ function speakWord(text) {
 }
 
 // 1. Quản lý Tra từ điển (Đã tích hợp Anh - Việt)
+// 1. Quản lý Tra từ điển (Đã tích hợp Anh - Việt, Phiên âm & Phát âm)
 window.openDictionaryModal = function() {
     const modal = document.getElementById('dict-modal');
     if (modal) modal.style.display = 'flex';
@@ -111,9 +112,13 @@ window.lookupWord = async function() {
             }
         }
 
+        // Trường hợp không tìm thấy trong Dictionary API chính nhưng có nghĩa dịch từ MyMemory
         if (!dictResponse || !dictResponse.ok) {
             if (vietnameseMeaning && vietnameseMeaning.toLowerCase() !== word) {
-                resultBox.innerHTML = `<div style="margin-bottom: 8px;"><b style="font-size: 1.2em; color: #540606;">${escapeHTML(word)}</b></div>` +
+                resultBox.innerHTML = `<div style="margin-bottom: 8px;">` +
+                                      `<b style="font-size: 1.2em; color: #540606;">${escapeHTML(word)}</b> ` +
+                                      `<button type="button" onclick="speakWord('${escapeHTML(word)}')" style="background:#ffc107; border:none; border-radius:4px; padding:2px 8px; cursor:pointer; font-weight:bold; margin-left: 6px;">🔊 Đọc</button>` +
+                                      `</div>` +
                                       `<div style="margin-top: 8px; padding: 10px; background: #e8f5e9; border-radius: 6px; border: 1px solid #c8e6c9;">` +
                                       `<b style="color: #2e7d32;">🇻🇳 Nghĩa tiếng Việt:</b> <span style="color: #1b5e20; font-weight: bold; font-size: 1.1em;">${escapeHTML(vietnameseMeaning)}</span>` +
                                       `</div>`;
@@ -129,10 +134,19 @@ window.lookupWord = async function() {
             let phonetic = entry.phonetic || (entry.phonetics && entry.phonetics.find(p => p.text)?.text) || '';
             let audioUrl = entry.phonetics && entry.phonetics.find(p => p.audio)?.audio || '';
 
-            let html = `<div style="margin-bottom: 8px;"><b style="font-size: 1.2em; color: #540606;">${escapeHTML(entry.word)}</b> <span style="color: #666; font-style: italic;">${escapeHTML(phonetic)}</span>`;
-            if (audioUrl) {
-                html += ` <button type="button" onclick="new Audio('${audioUrl}').play()" style="background:#ffc107; border:none; border-radius:4px; padding:2px 8px; cursor:pointer; font-weight:bold;">🔊 Nghe</button>`;
+            // Hiển thị từ, phiên âm và nút phát âm
+            let html = `<div style="margin-bottom: 8px;"><b style="font-size: 1.2em; color: #540606;">${escapeHTML(entry.word)}</b>`;
+            if (phonetic) {
+                html += ` <span style="color: #d9534f; font-family: monospace; font-style: italic; margin-left: 6px;">${escapeHTML(phonetic)}</span>`;
             }
+            
+            // Nút nghe Audio chuẩn từ API (nếu có)
+            if (audioUrl) {
+                html += ` <button type="button" onclick="new Audio('${audioUrl}').play()" style="background:#ffc107; border:none; border-radius:4px; padding:2px 8px; cursor:pointer; font-weight:bold; margin-left: 6px;">🔊 Nghe Audio</button>`;
+            }
+            
+            // Nút đọc dự phòng bằng Web Speech API (speakWord)
+            html += ` <button type="button" onclick="speakWord('${escapeHTML(entry.word)}')" style="background:#ffc107; border:none; border-radius:4px; padding:2px 8px; cursor:pointer; font-weight:bold; margin-left: 4px;">🔊 Đọc TTS</button>`;
             html += `</div>`;
 
             if (vietnameseMeaning && vietnameseMeaning.toLowerCase() !== word) {
