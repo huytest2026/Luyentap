@@ -147,7 +147,14 @@
 <body>
 
 <div class="container" id="start-screen">
-    <h1 style="color: #540606; text-align: center; margin-bottom: 20px;">Bài Kiểm Tra Toán Anh</h1>
+    <!-- TIÊU ĐỀ TRANG CHỦ KÈM NÚT TRA TỪ VÀ NÚT TỐI -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+        <h1 style="color: #540606; margin: 0;">Bài Kiểm Tra Toán Anh</h1>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" onclick="window.openDictionaryModal()" style="background: #17a2b8; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.95em;">📖 Tra từ</button>
+            <!-- Nếu bạn có nút Tối riêng, có thể đặt ở đây hoặc giữ nguyên vị trí cũ -->
+        </div>
+    </div>
     
     <label for="student-code">Mã học sinh:</label>
     <input type="text" id="student-code" value="Huy" placeholder="Nhập MÃ HỌC SINH..." style="width: 100%; padding: 14px; margin: 8px 0 15px 0; box-sizing: border-box; font-size: 1.1em; border: 1px solid #540606; border-radius: 8px;">
@@ -301,7 +308,6 @@
                             ? subjectSelect.options[subjectSelect.selectedIndex].text 
                             : 'MÔN TOÁN';
 
-        // Kiểm tra xem có phải Đề Tổng Hợp không
         const quizContent = document.getElementById('quiz-screen')?.innerText || '';
         if (quizContent.includes('ĐỀ TỔNG HỢP TOÁN') || document.querySelector('#quiz-screen')?.dataset?.isDeTongHop === 'true') {
             subjectText = 'TỔNG HỢP TOÁN (21 CÂU)';
@@ -432,7 +438,6 @@
                     return;
                 }
 
-                // Lấy nguồn dữ liệu đầy đủ từ AppState
                 const poolData = (window.AppState && window.AppState.allQuizData) || window.allQuizData || [];
 
                 if (!poolData || poolData.length === 0) {
@@ -476,7 +481,6 @@
                 if (btnDict) btnDict.style.setProperty('display', 'none', 'important');
                 if (btnVerbs) btnVerbs.style.setProperty('display', 'none', 'important');
 
-                // Khởi tạo bài thi chuẩn ứng dụng
                 if (window.AppState) {
                     AppState.currentQuizData = selectedQuestions.map(item => {
                         let correctKeys = (typeof getCorrectKeys === 'function') ? getCorrectKeys(item) : [];
